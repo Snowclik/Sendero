@@ -1,7 +1,7 @@
 import type { FunctionalComponent } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useEffect, useErrorBoundary, useRef, useState } from 'preact/hooks';
-import { Award, Check, Lock, MousePointerClick, RotateCcw, Shirt, Sun, Tent, Trophy, Volume2, VolumeX, WifiOff, Wind } from 'lucide-preact';
+import { Award, Check, Lock, MousePointerClick, RotateCcw, Shirt, Sun, Tent, Trophy, Volume2, WifiOff, Wind } from 'lucide-preact';
 import { IsoWorld, type StationState } from '../game/IsoWorld';
 import { MissionPanel, STATION_ICONS, type MissionResult } from './MissionPanel';
 import { AchievementsModal } from './AchievementsModal';
@@ -19,7 +19,7 @@ import {
   MAX_SUNS, createProfile, isTauriEnvironment, loadStore, normalizeProfile, recordSkill, saveStore,
   type SaveStore, type StudentProfile,
 } from '../services/storageService';
-import { isVoiceEnabled, onListen, playClickSound, playSuccessSound, say, sayText, sayTpl, setVoiceEnabled, stopSpeaking } from '../services/soundService';
+import { onListen, playClickSound, playSuccessSound, say, sayText, sayTpl, stopSpeaking } from '../services/soundService';
 
 const NAMES = Object.fromEntries(MISSIONS.map((m) => [m.id, m.stationName])) as Record<MissionId, string>;
 const roundBtn = 'w-12 h-12 rounded-2xl bg-[#fffaf0] border-[3px] border-white shadow-[0_5px_0_rgba(146,112,52,.22)] flex items-center justify-center text-slate-700 active:translate-y-[3px] active:shadow-[0_2px_0_rgba(146,112,52,.22)] transition-all';
@@ -49,7 +49,6 @@ const Game: FunctionalComponent = () => {
   const [anchor, setAnchor] = useState<HTMLDivElement | null>(null);
   const [logros, setLogros] = useState(false);
   const [breath, setBreath] = useState<number | null>(null);
-  const [voice, setVoice] = useState(isVoiceEnabled());
   const [webglError, setWebglError] = useState(false);
 
   const student = store?.profiles.find((p) => p.id === store.activeId) ?? null;
@@ -289,9 +288,6 @@ const Game: FunctionalComponent = () => {
           </div>
 
           <div className="pointer-events-auto flex items-center gap-2">
-            <button onClick={() => { setVoiceEnabled(!voice); setVoice(!voice); }} className={roundBtn} title={voice ? 'Silenciar voz' : 'Activar voz'} aria-label={voice ? 'Silenciar voz' : 'Activar voz'} aria-pressed={!voice}>
-              {voice ? <Volume2 className="w-6 h-6 text-sky-600" /> : <VolumeX className="w-6 h-6 text-slate-400" />}
-            </button>
             <button onClick={() => { setMission(null); setPhase('wardrobe'); }} className={roundBtn} title="Vestuario" aria-label="Vestuario">
               <Shirt className="w-6 h-6 text-rose-500" />
             </button>

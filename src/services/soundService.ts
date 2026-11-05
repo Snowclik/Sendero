@@ -140,21 +140,7 @@ let manifest: Record<string, string> | null = null;
 let manifestLoading: Promise<void> | null = null;
 let current: HTMLAudioElement | null = null;
 let token = 0;
-let enabled = true;
 let listenHook: (() => void) | null = null;
-
-try {
-  enabled = localStorage.getItem('sendero_voz') !== 'off';
-} catch {}
-
-export const isVoiceEnabled = () => enabled;
-export function setVoiceEnabled(on: boolean) {
-  enabled = on;
-  try {
-    localStorage.setItem('sendero_voz', on ? 'on' : 'off');
-  } catch {}
-  if (!on) stopSpeaking();
-}
 /** Se llama cuando el niño pide escuchar algo (para el logro "Buen oído"). */
 export const onListen = (fn: () => void) => (listenHook = fn);
 
@@ -191,7 +177,7 @@ function playUrl(url: string, my: number): Promise<void> {
  */
 export async function say(parts: (string | number)[], opts: { user?: boolean } = {}) {
   if (typeof window === 'undefined') return;
-  if (!enabled && !opts.user) return;
+  if (!opts.user) return; // la voz SOLO suena cuando el niño toca un botón de altavoz
   if (opts.user) listenHook?.();
   stopSpeaking();
   const my = ++token;

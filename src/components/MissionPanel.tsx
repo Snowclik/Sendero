@@ -153,12 +153,25 @@ const CounterStep: FunctionalComponent<StepProps<'counter'>> = ({ step, problem,
   const target = Number(problem.params.target);
   const [n, setN] = useState(0);
   const [done, setDone] = useState(false);
+  const [poured, setPoured] = useState(0); // botellas ya vaciadas en la mochila
   const total = n * per;
   const test = () => {
     if (done || n === 0) return;
     setDone(true);
-    const diff = Math.abs(target - total);
-    onSubmit(total === target ? { ok: true } : { ok: false, tpl: total < target ? LINES.counterLow : LINES.counterHigh, params: { n, per, total, diff } });
+    // Se vacía una botella a la vez: el niño ve 3, 6, 9, 12... (multiplicar = sumar varias veces)
+    let k = 0;
+    const tick = () => {
+      k++;
+      setPoured(k);
+      playClickSound();
+      if (k < n) setTimeout(tick, 550);
+      else
+        setTimeout(() => {
+          const diff = Math.abs(target - total);
+          onSubmit(total === target ? { ok: true } : { ok: false, tpl: total < target ? LINES.counterLow : LINES.counterHigh, params: { n, per, total, diff } });
+        }, 500);
+    };
+    setTimeout(tick, 250);
   };
   const set = (v: number) => !done && setN(Math.max(0, Math.min(problem.max ?? 6, v)));
   useKeys({ '-': () => set(n - 1), '+': () => set(n + 1), Enter: test }, [n, done]);
@@ -168,15 +181,18 @@ const CounterStep: FunctionalComponent<StepProps<'counter'>> = ({ step, problem,
         <div className="grid grid-cols-3 gap-2 flex-1">
           {Array.from({ length: problem.max ?? 6 }).map((_, i) => {
             const on = i < n;
+            const empty = i < poured; // ya se vació en la mochila
             return (
               <button
                 key={i}
                 onClick={() => { playClickSound(); set(on && i === n - 1 ? i : i + 1); }}
                 aria-label={`${step.data.item[0]} ${i + 1} ${on ? 'en la mochila' : 'fuera'}`}
                 aria-pressed={on}
-                className={`cozy-tile aspect-[5/4] flex flex-col items-center justify-center ${on ? 'is-on' : ''}`}
+                className={`cozy-tile aspect-[5/4] flex flex-col items-center justify-center ${on ? 'is-on' : ''} ${empty ? 'opacity-50' : ''}`}
               >
-                <BottleArt on={on} size={34} />
+                <span className={i === poured - 1 ? 'inline-block rotate-[-40deg] transition-transform' : 'inline-block transition-transform'}>
+                  <BottleArt on={on && !empty} size={34} />
+                </span>
                 <span className={`text-[11px] font-black ${on ? 'text-sky-700' : 'text-slate-400'}`}>{per} L</span>
               </button>
             );
@@ -184,12 +200,15 @@ const CounterStep: FunctionalComponent<StepProps<'counter'>> = ({ step, problem,
         </div>
         <div className="relative flex flex-col items-center">
           <Backpack className="w-7 h-7 text-amber-500 mb-1" />
-          <TankArt value={done ? total : 0} max={target * 1.3} mark={target} width={70} height={110} label={`Meta: ${target} litros`} />
+          <TankArt value={poured * per} max={target * 1.3} mark={target} width={70} height={110} label={`Meta: ${target} litros`} />
           {!done && <Mystery />}
+          <span className="text-sm font-black text-sky-700">{done ? `${poured * per} L` : `meta ${target} L`}</span>
         </div>
       </div>
-      <p className="text-center text-sm font-black text-slate-500">
-        {done ? `${n} × ${per} = ${total}` : `Elegiste ${n} ${n === 1 ? step.data.item[0] : step.data.item[1]}`}
+      <p className="text-center text-base font-black text-slate-600" aria-live="polite">
+        {done
+          ? Array.from({ length: poured }).map((_, i) => (i + 1) * per).join(' → ') + (poured === n ? `  (${n} × ${per} = ${total})` : '')
+          : `Elegiste ${n} ${n === 1 ? step.data.item[0] : step.data.item[1]}`}
       </p>
       <TryBtn onClick={test} disabled={done || n === 0} />
     </div>
@@ -299,8 +318,18 @@ function useReadGate(ms: number) {
   return open;
 }
 
+/** Cada situación se ve distinta: el niño nota cuando cambia. */
+const THEMES = [
+  { paper: '#e0f2fe', line: '#bae6fd', head: 'bg-sky-500', chip: 'bg-sky-100 text-sky-700' },
+  { paper: '#fef3c7', line: '#fde68a', head: 'bg-amber-500', chip: 'bg-amber-100 text-amber-800' },
+  { paper: '#ede9fe', line: '#ddd6fe', head: 'bg-violet-500', chip: 'bg-violet-100 text-violet-700' },
+];
+
 const ReadStep: FunctionalComponent<StepProps<'read'>> = ({ step, problem, onSubmit }) => {
   const v = step.data.variants[problem.variant ?? 0];
+  const th = THEMES[(problem.variant ?? 0) % THEMES.length];
+  const [first, ...rest] = v.blocks;
+  const FirstIcon = first.icon ? ICONS[first.icon] : BookOpen;
   const open = useReadGate(2800);
   const [picked, setPicked] = useState<string | null>(null);
   const options = (problem.order ?? step.data.options.map((o) => o.id)).map((id) => step.data.options.find((o) => o.id === id)!);
@@ -315,12 +344,17 @@ const ReadStep: FunctionalComponent<StepProps<'read'>> = ({ step, problem, onSub
   useKeys(keys, [picked, open]);
   return (
     <div className="flex flex-col gap-3">
-      <PaperNote tilt={-0.6}>
-        <span className="absolute top-2 right-3 rotate-[4deg] inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-700 border-2 border-emerald-600/60 rounded-lg px-1.5 py-0.5">
-          <ShieldCheck className="w-3 h-3" /> {step.data.badge}
-        </span>
-        <div className="flex flex-col gap-2 mt-2">
-          {v.blocks.map((b, i) => {
+      <div className="rounded-[16px] overflow-hidden shadow-[0_3px_0_#e6d3ab]" style={{ background: `repeating-linear-gradient(${th.paper} 0 27px, ${th.line} 27px 28px)` }}>
+        {/* Encabezado grande: DÓNDE estás. Cambia de color y de ícono con cada situación. */}
+        <div className={`flex items-center gap-3 px-4 py-3 text-white ${th.head}`}>
+          <span className="w-14 h-14 shrink-0 rounded-2xl bg-white/25 flex items-center justify-center"><FirstIcon className="w-9 h-9" /></span>
+          <span className="flex-1">
+            <span className="block text-[11px] font-black uppercase tracking-wide opacity-90">{step.data.badge} {(problem.variant ?? 0) + 1}</span>
+            <span className="block text-xl font-black leading-tight">{first.text}</span>
+          </span>
+        </div>
+        <div className="flex flex-col gap-2 px-4 py-3">
+          {rest.map((b, i) => {
             const Icon = b.icon ? ICONS[b.icon] : null;
             return (
               <div key={i} className="flex items-center gap-3">
@@ -329,9 +363,9 @@ const ReadStep: FunctionalComponent<StepProps<'read'>> = ({ step, problem, onSub
               </div>
             );
           })}
+          <p className="text-right text-xs font-bold italic text-slate-500">— {step.data.source}</p>
         </div>
-        <p className="mt-2 text-right text-xs font-bold italic text-slate-500">— {step.data.source}</p>
-      </PaperNote>
+      </div>
       <p className="text-lg font-extrabold text-slate-800">{v.question}</p>
       <div className={`grid grid-cols-2 gap-2 transition-opacity duration-500 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         {options.map((o) => {
@@ -351,12 +385,14 @@ const ReadStep: FunctionalComponent<StepProps<'read'>> = ({ step, problem, onSub
 
 const SiftStep: FunctionalComponent<StepProps<'sift'>> = ({ step, problem, onSubmit }) => {
   const pair = step.data.pairs[problem.variant ?? 0];
+  const th = THEMES[(problem.variant ?? 0) % THEMES.length];
   const cards = (problem.order ?? ['reliable', 'rumor']).map((k, i) => ({ label: i === 0 ? 'A' : 'B', reliable: k === 'reliable', msg: pair[k as 'reliable' | 'rumor'] }));
   const [inspected, setInspected] = useState<string[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
   const all = inspected.length === 2;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+      <span className={`sm:col-span-2 justify-self-center px-3 py-1 rounded-full text-xs font-black ${th.chip}`}>Mensajes del grupo {(problem.variant ?? 0) + 1}</span>
       {cards.map((c, k) => {
         const seen = inspected.includes(c.label);
         const tone = c.reliable ? 'text-emerald-700' : 'text-rose-600';
@@ -469,6 +505,7 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
   const [outcome, setOutcome] = useState<null | 'retry' | 'practice' | 'solved'>(null);
   const [totals, setTotals] = useState({ mistakes: 0, struggled: 0, hints: 0 });
   const [hint, setHint] = useState(0);
+  const [fresh, setFresh] = useState<string | null>(null); // cinta "¡Situación nueva!" tras un cambio
   const [chispa, setChispa] = useState<{ text: string; parts: (string | number)[]; mood: SquirrelMood; n: number }>({ text: mission.shortStory.join(' '), parts: [...mission.shortStory], mood: 'idle', n: 0 });
   const [breathing, setBreathing] = useState(false);
   const [newBadges, setNewBadges] = useState<string[]>([]);
@@ -507,6 +544,7 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
     setProblem(p);
     setPid((x) => x + 1);
     setOutcome(null);
+    setFresh(prev ? (s.type === 'read' ? '¡Situación nueva!' : s.type === 'sift' ? '¡Mensajes nuevos!' : s.type === 'order' ? '¡Otra vez, con calma!' : '¡Números nuevos!') : null);
     setHint(0);
     say(stepSpeech(s, p)); // narración automática: leer no debe ser una barrera
     const role = isDuo && s.duoRole && mission.duoRoles ? (s.duoRole === 'AB' ? null : mission.duoRoles[s.duoRole]) : undefined;
@@ -580,7 +618,6 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
   const tapSquirrel = () => {
     onChispaTap();
     if (phase === 'step' && !outcome) showHint(hint + 1 > 3 ? 3 : hint + 1);
-    else say(chispa.parts, { user: true });
   };
 
   const instruction = fill(step.instruction, params);
@@ -663,6 +700,11 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
                 <RoundBtn label="Escuchar" onClick={() => say(stepSpeech(step, problem), { user: true })} tone="bg-sky-100 text-sky-700 shadow-[0_4px_0_#7dd3fc]"><Volume2 className="w-5 h-5" /></RoundBtn>
               </div>
 
+              {fresh && (
+                <div key={`f${pid}`} className="self-center anim-hop mt-3">
+                  <span className="cozy-ribbon !bg-rose-500 text-base">{fresh}</span>
+                </div>
+              )}
               <div key={pid}>
                 {step.type === 'counter' && <CounterStep step={step} {...stepProps} />}
                 {step.type === 'share' && <ShareStep step={step} {...stepProps} />}

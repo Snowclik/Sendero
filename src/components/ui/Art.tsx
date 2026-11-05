@@ -3,6 +3,29 @@
  * Chispa la ardilla es la voz del juego: guía, pistas y celebraciones.
  */
 import type { FunctionalComponent } from 'preact';
+import { useEffect, useRef, useState } from 'preact/hooks';
+
+/** Anima un número hacia su nuevo valor (las transiciones CSS no animan atributos SVG como height). */
+export function useTween(target: number, ms = 450) {
+  const [v, setV] = useState(target);
+  const from = useRef(target);
+  useEffect(() => {
+    const start = performance.now();
+    const a = from.current;
+    let raf = 0;
+    const step = (t: number) => {
+      const k = Math.min(1, (t - start) / ms);
+      const e = 1 - Math.pow(1 - k, 3);
+      const cur = a + (target - a) * e;
+      from.current = cur;
+      setV(cur);
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  return v;
+}
 
 export type SquirrelMood = 'idle' | 'happy' | 'thinking';
 
@@ -74,8 +97,9 @@ export const BeamArt: FunctionalComponent<{ on: boolean; size?: number }> = ({ o
 
 /** Tanque con nivel de agua y marca objetivo. */
 export const TankArt: FunctionalComponent<{ value: number; max: number; mark?: number; width?: number; height?: number; label?: string }> = ({
-  value, max, mark, width = 90, height = 130, label,
+  value: target, max, mark, width = 90, height = 130, label,
 }) => {
+  const value = useTween(target); // el agua sube de verdad, no aparece de golpe
   const inner = height - 24;
   const lvl = Math.min(1.08, value / max);
   const waterH = inner * lvl;
@@ -88,8 +112,8 @@ export const TankArt: FunctionalComponent<{ value: number; max: number; mark?: n
         <rect x="10" y="10" width={width - 20} height={height - 20} rx="10" />
       </clipPath>
       <g clipPath={`url(#tank-${width}-${height})`}>
-        <rect x="0" y={12 + inner - waterH} width={width} height={waterH + 12} fill={over ? '#fda4af' : '#38bdf8'} style={{ transition: 'all .45s ease' }} />
-        <path d={`M0 ${12 + inner - waterH} q ${width / 4} -6 ${width / 2} 0 t ${width / 2} 0 v 6 h -${width} z`} fill="#7dd3fc" style={{ transition: 'all .45s ease' }} />
+        <rect x="0" y={12 + inner - waterH} width={width} height={waterH + 12} fill={over ? '#fda4af' : '#38bdf8'} />
+        <path d={`M0 ${12 + inner - waterH} q ${width / 4} -6 ${width / 2} 0 t ${width / 2} 0 v 6 h -${width} z`} fill="#7dd3fc" />
       </g>
       {markY !== null && (
         <>
