@@ -10,3 +10,6 @@ src-tauri/gen/schemas/
 Thumbs.db
 *.log
 .env
+
+# Documento interno de especificación (no publicar)
+tarea.md

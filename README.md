@@ -28,7 +28,7 @@ No necesita internet en ningún momento: sin CDN, sin fuentes externas, sin APIs
 | Chispa da pistas al tocarla (pregunta, luego pista visual, luego ejemplo) | Tutor socrático: nunca da la respuesta |
 | Textos de 1 a 10 palabras; lectura en voz alta en todo | Baja carga de lectura y de memoria de trabajo |
 
-**Los 5 candados anti-adicción** (`tarea.md`, sección 3B):
+**Los 5 candados anti-adicción:**
 
 1. **3 soles por día:** al gastarlos, el campamento descansa hasta mañana.
 2. **Misión fuera de la pantalla** al terminar cada estación, más respiración guiada.
