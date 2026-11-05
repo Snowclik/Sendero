@@ -2,7 +2,7 @@ import type { FunctionalComponent, ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import {
   Activity, ArrowDownToLine, ArrowRight, Award, Backpack, BedDouble, BookOpen, CalendarDays, CalendarX, Check, Clock, CloudLightning, CloudRain,
-  Delete, DoorClosed, DoorOpen, Droplet, Ear, Flame, Footprints, Hand, Home, ListOrdered, Megaphone, MessageCircle, Mountain, Phone,
+  Delete, DoorClosed, DoorOpen, Hammer, Newspaper, Package, Tent, Droplet, Ear, Flame, Footprints, Hand, Home, ListOrdered, Megaphone, MessageCircle, Mountain, Phone,
   RotateCcw, School, Search, Shield, ShieldCheck, Shirt, Sparkles, Sun, TreePine, Unplug, User, UserCheck, Users, UserX, Volume2, Waves, Wind, X, Zap,
 } from 'lucide-preact';
 import type { IconKey, MicroStep, Mission, SkillId } from '../data/missionsData';
@@ -12,24 +12,28 @@ import type { IsoWorld } from '../game/IsoWorld';
 import { GUESS, TIER_NAME, isReto } from '../game/brain';
 import { GlassButton } from './ui/GlassButton';
 import { BreathingModal } from './ui/BreathingModal';
+import { useShort } from './ui/useShort';
 import { BottleArt, SquirrelArt, TankArt, type SquirrelMood } from './ui/Art';
 import { playClickSound, playHintSound, playStepCompleteSound, playSuccessSound, say, sayText, stopSpeaking } from '../services/soundService';
 
 const ICONS: Record<IconKey, any> = {
   Shield, Hand, ArrowDownToLine, BedDouble, School, Activity, Zap, Footprints, Mountain, Waves, Unplug, Backpack, CloudRain, Droplet,
-  Home, Sun, CloudLightning, TreePine, Clock, Wind, DoorClosed, DoorOpen, Flame, Shirt, Megaphone, Phone,
+  Home, Sun, CloudLightning, TreePine, Clock, Wind, DoorClosed, DoorOpen, Flame, Shirt, Megaphone, Phone, BookOpen,
 };
 export const STATION_ICONS: Record<string, any> = {
   'nivel-sismo': Activity,
   'nivel-inundacion': Waves,
   'nivel-tormenta': CloudLightning,
   'nivel-incendio': Flame,
+  'isla-albergue': Tent,
+  'isla-reconstruccion': Hammer,
+  'isla-noticias': Newspaper,
   'reto-chispa': Sparkles,
 };
 const STEP_ICON = (s: MicroStep) =>
   s.type === 'counter' ? Backpack
   : s.type === 'share' ? DoorOpen
-  : s.type === 'number' ? (s.data.gen === 'rising' ? Waves : CloudLightning)
+  : s.type === 'number' ? ({ rising: Waves, thunder: CloudLightning, fraction: Droplet, money: Package, perimeter: Hammer, area: Home } as const)[s.data.gen]
   : s.type === 'sift' ? Search
   : s.type === 'order' ? ListOrdered
   : BookOpen;
@@ -109,11 +113,12 @@ const TryBtn = ({ onClick, disabled, children = '¡Probar!' }: { onClick: () => 
 );
 
 /** Candado numérico: el niño escribe el número (no hay opciones que adivinar). */
-const Keypad: FunctionalComponent<{ value: string; setValue: (v: string) => void; onSubmit: () => void; locked: boolean; unit: string }> = ({ value, setValue, onSubmit, locked, unit }) => {
-  const press = (d: string) => !locked && value.length < 3 && setValue(value + d);
+const Keypad: FunctionalComponent<{ value: string; setValue: (v: string) => void; onSubmit: () => void; locked: boolean; unit: string; decimal?: boolean }> = ({ value, setValue, onSubmit, locked, unit, decimal }) => {
+  const press = (d: string) => !locked && value.length < (decimal ? 6 : 3) && !(d === '.' && value.includes('.')) && setValue(value + d);
   const del = () => !locked && setValue(value.slice(0, -1));
   const keys: Record<string, () => void> = { Backspace: del, Enter: () => value && onSubmit() };
   '0123456789'.split('').forEach((d) => (keys[d] = () => press(d)));
+  if (decimal) keys['.'] = () => press('.');
   useKeys(keys, [value, locked]);
   return (
     <div className="flex flex-col items-center gap-2">
@@ -124,7 +129,7 @@ const Keypad: FunctionalComponent<{ value: string; setValue: (v: string) => void
         <span className="text-lg font-black text-slate-500">{unit}</span>
       </div>
       <div className="grid grid-cols-6 gap-1.5">
-        {'1234567890'.split('').map((d) => (
+        {(decimal ? '1234567890.' : '1234567890').split('').map((d) => (
           <button key={d} disabled={locked} onClick={() => { playClickSound(); press(d); }} className="cozy-tile w-11 h-11 text-xl font-black text-slate-700 disabled:opacity-50">
             {d}
           </button>
@@ -176,7 +181,7 @@ const CounterStep: FunctionalComponent<StepProps<'counter'>> = ({ step, problem,
   const set = (v: number) => !done && setN(Math.max(0, Math.min(problem.max ?? 6, v)));
   useKeys({ '-': () => set(n - 1), '+': () => set(n + 1), Enter: test }, [n, done]);
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 shortwide:grid shortwide:grid-cols-2 shortwide:items-start shortwide:[&>*:first-child]:row-span-3">
       <div className="cozy-inset p-3 flex gap-3 items-center">
         <div className="grid grid-cols-3 gap-2 flex-1">
           {Array.from({ length: problem.max ?? 6 }).map((_, i) => {
@@ -226,7 +231,7 @@ const ShareStep: FunctionalComponent<StepProps<'share'>> = ({ step, problem, onS
     onSubmit(rest === 0 ? { ok: true } : { ok: false, tpl: rest > 0 ? LINES.shareLow : LINES.shareHigh, params: { each, diff: Math.abs(rest) } });
   };
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 shortwide:grid shortwide:grid-cols-2 shortwide:items-start shortwide:[&>*:first-child]:row-span-3">
       <div className="cozy-inset p-3 flex items-center justify-between gap-2">
         <div className="flex flex-col items-center">
           <span className="w-16 h-16 rounded-2xl bg-white shadow-[0_4px_0_#e6d3ab] flex items-center justify-center text-slate-600"><Users className="w-9 h-9" /></span>
@@ -269,7 +274,7 @@ const NumberStep: FunctionalComponent<StepProps<'number'>> = ({ step, problem, w
     }
   };
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 shortwide:grid shortwide:grid-cols-2 shortwide:items-start shortwide:[&>*:first-child]:row-span-3">
       <div className="cozy-inset p-3 flex items-center justify-center gap-3 min-h-[110px]">
         {rising ? (
           <>
@@ -304,6 +309,76 @@ const NumberStep: FunctionalComponent<StepProps<'number'>> = ({ step, problem, w
       </div>
       <LiveHint text={!v ? null : rising ? (v * per < target ? `${v * per} cm: todavía no llega` : v * per > target ? `${v * per} cm: ¡se pasa!` : `${v * per} cm: ¡llega justo!`) : v * 3 < s ? `${v * 3} segundos: faltan` : v * 3 > s ? `${v * 3} segundos: sobran` : `${v * 3} segundos: ¡justo!`} good={v === answer} />
       <Keypad value={value} setValue={setValue} onSubmit={test} locked={done} unit={step.data.unit} />
+    </div>
+  );
+};
+
+/**
+ * Retos de 4.° y 5.° grado (islas): fracciones, decimales con dinero, perímetro y área.
+ * El dibujo ayuda a pensar, pero no da la respuesta: aquí el niño calcula.
+ */
+const SchoolStep: FunctionalComponent<StepProps<'number'>> = ({ step, problem, onSubmit }) => {
+  const [value, setValue] = useState('');
+  const [done, setDone] = useState(false);
+  const p = problem.params;
+  const gen = step.data.gen;
+  const a = Number(p.a);
+  const b = Number(p.b);
+  const test = () => {
+    if (done || !value) return;
+    setDone(true);
+    const ok = Math.abs(Number(value) - Number(problem.answer)) < 0.001;
+    const tpl = gen === 'fraction' ? LINES.fracWrong : gen === 'money' ? LINES.moneyWrong : gen === 'perimeter' ? LINES.perimWrong : LINES.areaWrong;
+    onSubmit(ok ? { ok: true } : { ok: false, tpl, params: { ...p, part: Number(p.total) / Number(p.den) } });
+  };
+  const cell = Math.max(10, Math.min(26, Math.floor(200 / Math.max(a || 1, b || 1))));
+  return (
+    <div className="flex flex-col gap-3 shortwide:grid shortwide:grid-cols-2 shortwide:items-start shortwide:[&>*:first-child]:row-span-3">
+      <div className="cozy-inset p-3 flex flex-col items-center justify-center gap-2 min-h-[120px]">
+        {gen === 'fraction' && (
+          <>
+            <span className="text-3xl font-black text-amber-600 leading-none">{p.num}/{p.den}</span>
+            <span className="flex w-full max-w-[260px] h-9 rounded-xl overflow-hidden border-[3px] border-white shadow-[0_3px_0_#e6d3ab]" aria-label={`${p.den} partes iguales`}>
+              {Array.from({ length: Number(p.den) }).map((_, i) => (
+                <span key={i} className={`flex-1 border-r-2 last:border-r-0 border-white ${i < Number(p.num) ? 'bg-amber-400' : 'bg-sky-200'}`} />
+              ))}
+            </span>
+            <span className="text-sm font-black text-slate-600">Todo el agua: {p.total} litros</span>
+          </>
+        )}
+        {gen === 'money' && (
+          <>
+            <span className="flex flex-wrap justify-center gap-1.5 max-w-[260px]">
+              {Array.from({ length: Number(p.n) }).map((_, i) => (
+                <span key={i} className="flex flex-col items-center px-1.5 py-1 rounded-xl bg-white shadow-[0_3px_0_#e6d3ab]">
+                  <Package className="w-6 h-6 text-amber-600" />
+                  <span className="text-[11px] font-black text-emerald-700">B/. {p.price}</span>
+                </span>
+              ))}
+            </span>
+            <span className="text-xs font-bold text-slate-500">Usa el punto para los centavos: 2.50</span>
+          </>
+        )}
+        {gen === 'perimeter' && (
+          <div className="relative my-6 mx-10" style={{ width: Math.min(200, a * 8 + 40), height: Math.min(110, b * 6 + 30) }}>
+            <div className="absolute inset-0 rounded-md border-[4px] border-dashed border-amber-500 bg-emerald-200/70" />
+            <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-sm font-black text-slate-700">{a} m</span>
+            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-sm font-black text-slate-700">{a} m</span>
+            <span className="absolute top-1/2 -left-9 -translate-y-1/2 text-sm font-black text-slate-700">{b} m</span>
+            <span className="absolute top-1/2 -right-9 -translate-y-1/2 text-sm font-black text-slate-700">{b} m</span>
+          </div>
+        )}
+        {gen === 'area' && (
+          <div className="relative mt-5 ml-8">
+            <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-sm font-black text-slate-700">{a} m</span>
+            <span className="absolute top-1/2 -left-8 -translate-y-1/2 text-sm font-black text-slate-700">{b} m</span>
+            <div className="grid border-2 border-sky-600" style={{ gridTemplateColumns: `repeat(${a}, ${cell}px)` }} aria-label={`${a} por ${b} cuadros`}>
+              {Array.from({ length: a * b }).map((_, i) => <span key={i} style={{ height: cell }} className="border border-sky-300 bg-sky-100" />)}
+            </div>
+          </div>
+        )}
+      </div>
+      <Keypad value={value} setValue={setValue} onSubmit={test} locked={done} unit={step.data.unit} decimal={gen === 'money'} />
     </div>
   );
 };
@@ -346,7 +421,8 @@ const ReadStep: FunctionalComponent<StepProps<'read'>> = ({ step, problem, onSub
   const FirstIcon = first.icon ? ICONS[first.icon] : BookOpen;
   const open = useReadGate(2800);
   const [picked, setPicked] = useState<string | null>(null);
-  const options = (problem.order ?? step.data.options.map((o) => o.id)).map((id) => step.data.options.find((o) => o.id === id)!);
+  const pool = v.options ?? step.data.options;
+  const options = (problem.order ?? pool.map((o) => o.id)).map((id) => pool.find((o) => o.id === id)!).filter(Boolean);
   const answer = (id: string) => {
     if (picked || !open) return;
     playClickSound();
@@ -357,11 +433,11 @@ const ReadStep: FunctionalComponent<StepProps<'read'>> = ({ step, problem, onSub
   options.forEach((o, i) => (keys[String(i + 1)] = () => answer(o.id)));
   useKeys(keys, [picked, open]);
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 shortwide:grid shortwide:grid-cols-2 shortwide:items-start shortwide:[&>*:first-child]:row-span-3">
       <div className="rounded-[16px] overflow-hidden shadow-[0_3px_0_#e6d3ab]" style={{ background: `repeating-linear-gradient(${th.paper} 0 27px, ${th.line} 27px 28px)` }}>
         {/* Encabezado grande: DÓNDE estás. Cambia de color y de ícono con cada situación. */}
-        <div className={`flex items-center gap-3 px-4 py-3 text-white ${th.head}`}>
-          <span className="w-14 h-14 shrink-0 rounded-2xl bg-white/25 flex items-center justify-center"><FirstIcon className="w-9 h-9" /></span>
+        <div className={`flex items-center gap-3 px-4 py-3 short:py-1.5 text-white ${th.head}`}>
+          <span className="w-14 h-14 short:w-10 short:h-10 shrink-0 rounded-2xl bg-white/25 flex items-center justify-center"><FirstIcon className="w-9 h-9 short:w-6 short:h-6" /></span>
           <span className="flex-1">
             <span className="block text-[11px] font-black uppercase tracking-wide opacity-90">{step.data.badge} {(problem.variant ?? 0) + 1}</span>
             <span className="block text-xl font-black leading-tight">{first.text}</span>
@@ -454,7 +530,7 @@ const OrderStep: FunctionalComponent<StepProps<'order'>> = ({ step, problem, onS
   };
   useKeys({ Enter: check }, [slots, done]);
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 shortwide:grid shortwide:grid-cols-2 shortwide:items-start shortwide:[&>*:first-child]:row-span-3">
       <div className="cozy-inset p-3 flex items-center justify-between gap-1">
         {[0, 1, 2].map((i) => {
           const it = step.data.items.find((x) => x.id === slots[i]);
@@ -524,6 +600,7 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
   const [breathing, setBreathing] = useState(false);
   const [newBadges, setNewBadges] = useState<string[]>([]);
   const [tier, setTier] = useState(1);
+  const short = useShort();
 
   const step = mission.steps[idx];
   const isMath = mission.id === 'nivel-sismo' || mission.id === 'nivel-incendio'; // solo define el color de acento
@@ -645,12 +722,12 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
 
   return (
     <>
-      <section className="cozy-panel fixed z-30 left-2 right-2 bottom-2 max-h-[70vh] lg:max-h-none lg:left-auto lg:right-4 lg:top-24 lg:bottom-4 lg:w-[470px] flex flex-col animate-fadeIn" aria-label={mission.title}>
-        <header className="relative px-4 pt-3 pb-2 flex flex-col items-center gap-2">
-          <button onClick={() => { stopSpeaking(); onExit(); }} className="absolute right-3 top-3 w-10 h-10 rounded-2xl bg-white shadow-[0_4px_0_#e6d3ab] flex items-center justify-center text-slate-500 active:translate-y-[3px] active:shadow-none" aria-label="Volver al valle">
+      <section className="cozy-panel fixed z-30 left-2 right-2 bottom-2 max-h-[70vh] lg:max-h-none lg:left-auto lg:right-4 lg:top-24 lg:bottom-4 lg:w-[470px] short:!top-2 short:!bottom-2 short:!max-h-none shortwide:!left-auto shortwide:!right-2 shortwide:!w-[min(860px,80vw)] flex flex-col animate-fadeIn" aria-label={mission.title}>
+        <header className="relative px-4 pt-3 pb-2 short:pt-2 short:pb-1 short:pr-14 flex flex-col short:flex-row short:justify-center items-center gap-2 short:gap-3">
+          <button onClick={() => { stopSpeaking(); onExit(); }} className="absolute right-3 top-3 short:top-1.5 w-10 h-10 rounded-2xl bg-white shadow-[0_4px_0_#e6d3ab] flex items-center justify-center text-slate-500 active:translate-y-[3px] active:shadow-none" aria-label="Volver al valle">
             <X className="w-5 h-5" />
           </button>
-          <span className="cozy-ribbon text-[15px] max-w-[80%] truncate">{mission.stationName}</span>
+          <span className="cozy-ribbon text-[15px] short:text-xs max-w-[80%] truncate">{mission.stationName}</span>
           {phase === 'step' && (
             <div className="flex items-center gap-2" aria-label={`Paso ${idx + 1} de 3`}>
               {mission.steps.map((s, i) => {
@@ -658,10 +735,10 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
                 const state = i < idx ? 'done' : i === idx ? 'now' : 'next';
                 return (
                   <div key={i} className="flex items-center gap-2">
-                    <span className={`w-11 h-11 rounded-2xl flex items-center justify-center ${state === 'done' ? 'bg-emerald-500 text-white shadow-[0_4px_0_#047857]' : state === 'now' ? 'bg-sky-500 text-white shadow-[0_4px_0_#0369a1]' : 'bg-[#f6ecd6] text-[#c8b48a]'}`}>
+                    <span className={`w-11 h-11 short:w-8 short:h-8 short:rounded-xl rounded-2xl flex items-center justify-center ${state === 'done' ? 'bg-emerald-500 text-white shadow-[0_4px_0_#047857]' : state === 'now' ? 'bg-sky-500 text-white shadow-[0_4px_0_#0369a1]' : 'bg-[#f6ecd6] text-[#c8b48a]'}`}>
                       {state === 'done' ? <Check className="w-6 h-6" /> : <Icon className="w-5 h-5" />}
                     </span>
-                    {i < 2 && <span className={`w-5 h-1.5 rounded-full ${i < idx ? 'bg-emerald-400' : 'bg-[#eadcbc]'}`} />}
+                    {i < 2 && <span className={`w-5 short:w-3 h-1.5 rounded-full ${i < idx ? 'bg-emerald-400' : 'bg-[#eadcbc]'}`} />}
                   </div>
                 );
               })}
@@ -672,7 +749,7 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
         <div className="flex-1 overflow-y-auto px-4 pb-3 flex flex-col gap-3">
           {phase === 'intro' && (
             <div className="flex flex-col items-center gap-4 py-2 animate-fadeIn">
-              <div className={`w-28 h-28 rounded-[32px] flex items-center justify-center ${isMath ? 'bg-amber-100 text-amber-500 shadow-[0_6px_0_#fcd34d]' : 'bg-emerald-100 text-emerald-600 shadow-[0_6px_0_#6ee7b7]'}`}>
+              <div className={`w-28 h-28 short:w-16 short:h-16 rounded-[32px] flex items-center justify-center ${isMath ? 'bg-amber-100 text-amber-500 shadow-[0_6px_0_#fcd34d]' : 'bg-emerald-100 text-emerald-600 shadow-[0_6px_0_#6ee7b7]'}`}>
                 <StationIcon className="w-14 h-14" />
               </div>
               <h2 className="text-xl font-black text-slate-800 text-center">{mission.title}</h2>
@@ -701,7 +778,7 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
                 </div>
               )}
               <div className="flex items-start gap-3">
-                <span className={`w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center ${isMath ? 'bg-amber-100 text-amber-500' : 'bg-emerald-100 text-emerald-600'}`}>
+                <span className={`w-14 h-14 short:hidden shrink-0 rounded-2xl flex items-center justify-center ${isMath ? 'bg-amber-100 text-amber-500' : 'bg-emerald-100 text-emerald-600'}`}>
                   <StepIcon className="w-8 h-8" />
                 </span>
                 <div className="flex-1 min-w-0">
@@ -729,7 +806,8 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
               <div key={pid}>
                 {step.type === 'counter' && <CounterStep step={step} {...stepProps} />}
                 {step.type === 'share' && <ShareStep step={step} {...stepProps} />}
-                {step.type === 'number' && <NumberStep step={step} {...stepProps} />}
+                {step.type === 'number' && (step.data.gen === 'rising' || step.data.gen === 'thunder') && <NumberStep step={step} {...stepProps} />}
+                {step.type === 'number' && step.data.gen !== 'rising' && step.data.gen !== 'thunder' && <SchoolStep step={step} {...stepProps} />}
                 {step.type === 'read' && <ReadStep step={step} {...stepProps} />}
                 {step.type === 'sift' && <SiftStep step={step} {...stepProps} />}
                 {step.type === 'order' && <OrderStep step={step} {...stepProps} />}
@@ -772,7 +850,7 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
         </div>
 
         {/* Chispa: la guía vive aquí. Tocarla = siguiente pista (nunca la respuesta). */}
-        <div className="flex items-end gap-2 px-3 pb-2 border-t-[3px] border-[#f6ecd6] pt-2">
+        <div className="flex items-end gap-2 px-3 pb-2 short:pb-1 border-t-[3px] border-[#f6ecd6] pt-2 short:pt-1">
           <button
             key={chispa.n}
             onClick={tapSquirrel}
@@ -780,9 +858,9 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
             aria-label={phase === 'step' && !outcome ? 'Chispa: pedir una pista' : 'Chispa: escuchar'}
             title="Toca a Chispa"
           >
-            <SquirrelArt mood={chispa.mood} size={64} />
+            <SquirrelArt mood={chispa.mood} size={short ? 42 : 64} />
           </button>
-          <div className="relative flex-1 mb-2 rounded-2xl bg-white border-[3px] border-[#f1e4c6] shadow-[0_4px_0_#e6d3ab] px-3 py-2">
+          <div className="relative flex-1 mb-2 short:mb-1 rounded-2xl bg-white border-[3px] border-[#f1e4c6] shadow-[0_4px_0_#e6d3ab] px-3 py-2">
             <span className="absolute -left-2 bottom-4 w-4 h-4 bg-white border-l-[3px] border-b-[3px] border-[#f1e4c6] rotate-45" />
             <div className="flex items-start gap-2">
               <div className="flex-1">

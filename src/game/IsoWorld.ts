@@ -15,7 +15,19 @@ import { buildCharacter, type Character } from './character';
 import { DEFAULT_OUTFIT, type Outfit } from '../data/wardrobe';
 
 const W = 36;
-const D = 28;
+const VD = 28; // filas del valle; más abajo está el mar con las islas
+const D = 50;
+/** Islas del "después": centro y radio en bloques. Se llega por puentes de madera. */
+const ISLANDS = [
+  { id: 'isla-albergue' as const, x: 8, z: 38, r: 5.5 },
+  { id: 'isla-reconstruccion' as const, x: 20, z: 43, r: 5.5 },
+  { id: 'isla-noticias' as const, x: 31, z: 37, r: 5.5 },
+];
+const BRIDGES: [number, number][][] = [
+  [[6, 25], [6, 33]], // valle (campamento) -> albergue
+  [[13, 40], [15, 42]], // albergue -> reconstrucción
+  [[25, 41], [27, 39]], // reconstrucción -> noticias
+];
 const RIVER_X0 = 21; // río: columnas 21..24 (4 bloques = 12 m, 3 m por bloque)
 const RIVER_X1 = 24;
 const BRIDGE_Z = [16, 17];
@@ -25,8 +37,11 @@ export const STATION_TILES: Record<MissionId, { x: number; z: number }> = {
   'nivel-inundacion': { x: 17, z: 8 }, // orilla del río (tanque medidor)
   'nivel-tormenta': { x: 19, z: 16 }, // campo abierto junto al puente
   'nivel-incendio': { x: 29, z: 12 }, // cabaña del bosque
+  'isla-albergue': { x: 8, z: 38 },
+  'isla-reconstruccion': { x: 20, z: 43 },
+  'isla-noticias': { x: 31, z: 37 },
 };
-const STATION_ORDER: MissionId[] = ['nivel-sismo', 'nivel-inundacion', 'nivel-tormenta', 'nivel-incendio'];
+const STATION_ORDER: MissionId[] = ['nivel-sismo', 'nivel-inundacion', 'nivel-tormenta', 'nivel-incendio', 'isla-albergue', 'isla-reconstruccion', 'isla-noticias'];
 const START = { x: 6.5, z: 21.5 };
 
 export type StationState = 'locked' | 'open' | 'done';
@@ -199,12 +214,38 @@ export class IsoWorld {
     const tileType = new Array<string>(W * D).fill('grass');
 
     // Río
-    for (let z = 0; z < D; z++) for (let x = RIVER_X0; x <= RIVER_X1; x++) tileType[idx(x, z)] = 'water';
+    for (let z = 0; z < VD; z++) for (let x = RIVER_X0; x <= RIVER_X1; x++) tileType[idx(x, z)] = 'water';
     // Arena en las orillas
-    for (let z = 0; z < D; z++) {
+    for (let z = 0; z < VD; z++) {
       tileType[idx(RIVER_X0 - 1, z)] = 'sand';
       tileType[idx(RIVER_X1 + 1, z)] = 'sand';
     }
+
+    // Mar con islas al sur del valle
+    const islandOf = (x: number, z: number) => ISLANDS.find((i) => Math.hypot(x + 0.5 - i.x, z + 0.5 - i.z) <= i.r);
+    for (let z = VD; z < D; z++)
+      for (let x = 0; x < W; x++) {
+        const isl = islandOf(x, z);
+        tileType[idx(x, z)] = !isl ? 'water' : Math.hypot(x + 0.5 - isl.x, z + 0.5 - isl.z) > isl.r - 1 ? 'sand' : 'grass';
+      }
+    // Puentes de madera (2 bloques de ancho) y caminos hasta cada estación
+    const line = (ax: number, az: number, bx: number, bz: number, fn: (x: number, z: number) => void) => {
+      const steps = Math.max(Math.abs(bx - ax), Math.abs(bz - az));
+      for (let i = 0; i <= steps; i++) fn(Math.round(ax + ((bx - ax) * i) / steps), Math.round(az + ((bz - az) * i) / steps));
+    };
+    for (const br of BRIDGES)
+      for (let k = 0; k < br.length - 1; k++)
+        line(br[k][0], br[k][1], br[k + 1][0], br[k + 1][1], (x, z) => {
+          for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+            const t = idx(x + dx, z + dz);
+            tileType[t] = tileType[t] === 'water' ? 'bridge' : 'path';
+          }
+        });
+    for (const i of ISLANDS) for (let z = i.z - 1; z <= i.z + 1; z++) for (let x = i.x - 1; x <= i.x + 1; x++) tileType[idx(x, z)] = 'path';
+    line(9, 38, 13, 40, (x, z) => { tileType[idx(x, z)] = 'path'; tileType[idx(x, z + 1)] = 'path'; });
+    line(21, 43, 25, 41, (x, z) => { tileType[idx(x, z)] = 'path'; tileType[idx(x, z + 1)] = 'path'; });
+    line(28, 39, 31, 37, (x, z) => { tileType[idx(x, z)] = 'path'; tileType[idx(x, z + 1)] = 'path'; });
+    line(6, 33, 8, 37, (x, z) => { tileType[idx(x, z)] = 'path'; tileType[idx(x + 1, z)] = 'path'; });
 
     // Sendero principal: campamento -> tablón -> planta -> puente -> cabaña
     const route = [
@@ -220,7 +261,7 @@ export class IsoWorld {
         const z = Math.round(az + ((bz - az) * s) / steps);
         for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
           const t = idx(x + dx, z + dz);
-          if (tileType[t] !== 'water') tileType[t] = 'path';
+          if (tileType[t] !== 'water' && tileType[t] !== 'bridge') tileType[t] = 'path';
         }
       }
     }
@@ -250,6 +291,12 @@ export class IsoWorld {
           boxes.push({ x: x + 0.5, y: -0.9, z: z + 0.5, sx: 1, sy: 1, sz: 1, color: C.sand });
           continue;
         }
+        if (t === 'bridge') {
+          boxes.push({ x: x + 0.5, y: -0.9, z: z + 0.5, sx: 1, sy: 1, sz: 1, color: C.sand });
+          boxes.push({ x: x + 0.5, y: -0.12, z: z + 0.5, sx: 1, sy: 0.16, sz: 1, color: (x + z) % 2 ? C.wood : C.woodDark });
+          this.water[idx(x, z)] = 1; // el agua se ve bajo los tablones
+          continue;
+        }
         const jitter = t === 'grass' ? rnd() * 0.05 : 0;
         const color =
           t === 'grass' ? C.grass[Math.floor(rnd() * 3)] : t === 'path' ? C.path : t === 'sand' ? C.sand : t === 'dirt' ? C.dirt : C.plaza;
@@ -271,8 +318,9 @@ export class IsoWorld {
       for (let x = 0; x < W; x++) {
         const t = tileType[idx(x, z)];
         if (t !== 'grass' || clear[idx(x, z)]) continue;
-        const border = x < 2 || z < 2 || x >= W - 2 || z >= D - 2;
-        if (border ? rnd() < 0.85 : rnd() < 0.1) tree(x, z);
+        const isl = z >= VD ? islandOf(x, z) : undefined;
+        const border = isl ? Math.hypot(x + 0.5 - isl.x, z + 0.5 - isl.z) > isl.r - 2.2 : x < 2 || z < 2 || x >= W - 2 || (z >= VD - 2 && z < VD);
+        if (border ? rnd() < (isl ? 0.45 : 0.85) : rnd() < 0.1) tree(x, z);
         else if (!border && rnd() < 0.03) {
           this.blocked[idx(x, z)] = 1;
           boxes.push({ x: x + 0.5, y: 0.25, z: z + 0.5, sx: 0.7, sy: 0.5, sz: 0.6, color: C.rock, ry: rnd() });
@@ -290,9 +338,10 @@ export class IsoWorld {
     this.buildBoard(boxes);
     this.buildCabin(boxes);
     this.buildBridgeParts();
+    this.buildIslands(boxes);
 
     // Suelo exterior infinito para que no se vea el vacío
-    const outside = new THREE.Mesh(new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x86c96a }));
+    const outside = new THREE.Mesh(new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x7cc6ea }));
     outside.position.set(W / 2, -1.0, D / 2); // al fondo de los bloques: no tapa el río
     this.scene.add(outside);
 
@@ -358,6 +407,36 @@ export class IsoWorld {
 
   private block(x0: number, z0: number, x1: number, z1: number) {
     for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) this.blocked[idx(x, z)] = 1;
+  }
+
+  /** Edificios de cada isla: albergue (carpa grande), obra (cerca y lona) y radio (antena). */
+  private buildIslands(boxes: Box[]) {
+    // Albergue: carpa grande + bidones de agua
+    const tent = new THREE.Mesh(new THREE.ConeGeometry(1.9, 2.2, 4), new THREE.MeshLambertMaterial({ color: 0x2dd4bf }));
+    tent.rotation.y = Math.PI / 4;
+    tent.position.set(10.5, 1.1, 35.5);
+    this.scene.add(tent);
+    this.block(9, 34, 11, 36);
+    for (let i = 0; i < 3; i++) boxes.push({ x: 5.5 + i * 0.7, y: 0.35, z: 36.2, sx: 0.5, sy: 0.7, sz: 0.5, color: C.sky });
+    this.block(5, 36, 7, 36);
+    // Reconstrucción: cerca de un huerto + lona sobre postes + tablas
+    for (let i = 0; i < 5; i++) {
+      boxes.push({ x: 16.5 + i * 0.5, y: 0.3, z: 45.6, sx: 0.12, sy: 0.6, sz: 0.12, color: C.woodDark });
+      boxes.push({ x: 16.5, y: 0.3, z: 43.6 + i * 0.5, sx: 0.12, sy: 0.6, sz: 0.12, color: C.woodDark });
+    }
+    boxes.push({ x: 17.5, y: 0.45, z: 45.6, sx: 2.2, sy: 0.08, sz: 0.06, color: C.wood });
+    boxes.push({ x: 16.5, y: 0.45, z: 44.6, sx: 0.06, sy: 0.08, sz: 2.2, color: C.wood });
+    for (const [x, z] of [[22.2, 44.2], [24.2, 44.2], [22.2, 45.8], [24.2, 45.8]]) boxes.push({ x, y: 0.7, z, sx: 0.14, sy: 1.4, sz: 0.14, color: C.woodDark });
+    boxes.push({ x: 23.2, y: 1.45, z: 45, sx: 2.4, sy: 0.08, sz: 2, color: C.rose });
+    boxes.push({ x: 18.6, y: 0.15, z: 40.6, sx: 1.4, sy: 0.3, sz: 0.5, color: C.wood });
+    this.block(16, 43, 16, 45);
+    this.block(22, 44, 24, 45);
+    // Noticias: caseta con antena de radio
+    boxes.push({ x: 33.5, y: 0.6, z: 35.5, sx: 1.8, sy: 1.2, sz: 1.6, color: C.cream });
+    boxes.push({ x: 33.5, y: 1.3, z: 35.5, sx: 2.1, sy: 0.25, sz: 1.9, color: C.roof });
+    boxes.push({ x: 34.2, y: 2.4, z: 35.0, sx: 0.12, sy: 2.4, sz: 0.12, color: 0x94a3b8 });
+    boxes.push({ x: 34.2, y: 3.7, z: 35.0, sx: 0.3, sy: 0.3, sz: 0.3, color: C.rose });
+    this.block(32, 34, 34, 36);
   }
 
   private buildCamp(boxes: Box[]) {
@@ -600,8 +679,22 @@ export class IsoWorld {
   // ==========================================================================
   // ENTRADA
   // ==========================================================================
+  /** Joystick táctil: dirección en pantalla (-1..1). 0,0 = suelto. */
+  private stick = { x: 0, y: 0 };
+  setStick(x: number, y: number) {
+    this.stick = { x, y };
+    if (x || y) {
+      this.path = [];
+      this.pendingInteract = null;
+      this.moveMarker.visible = false;
+    }
+  }
+
   private bindInput() {
     const el = this.renderer.domElement;
+    el.style.touchAction = 'none'; // el navegador no hace scroll ni zoom: lo maneja el juego
+    const touches = new Map<number, { x: number; y: number }>();
+    let pinch = 0; // distancia inicial entre dos dedos
     const isTyping = (e: KeyboardEvent) => {
       const t = (e.target as HTMLElement)?.tagName;
       return t === 'INPUT' || t === 'TEXTAREA';
@@ -619,8 +712,28 @@ export class IsoWorld {
     };
     const ku = (e: KeyboardEvent) => this.keys.delete(e.key.toLowerCase());
     const blur = () => this.keys.clear();
-    const pd = (e: PointerEvent) => (this.downAt = { x: e.clientX, y: e.clientY });
+    const pd = (e: PointerEvent) => {
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) {
+        const [a, b] = [...touches.values()];
+        pinch = Math.hypot(a.x - b.x, a.y - b.y);
+        this.downAt = null; // dos dedos = zoom, no caminar
+      } else this.downAt = { x: e.clientX, y: e.clientY };
+    };
+    const pm = (e: PointerEvent) => {
+      if (!touches.has(e.pointerId)) return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size !== 2 || !pinch || this.focus) return;
+      const [a, b] = [...touches.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (Math.abs(d - pinch) < 24) return;
+      this.zoom = this.userZoom = THREE.MathUtils.clamp(this.zoom + (d < pinch ? 1 : -1), 8, 20);
+      pinch = d;
+      this.resize();
+    };
     const pu = (e: PointerEvent) => {
+      touches.delete(e.pointerId);
+      if (touches.size < 2) pinch = 0;
       if (!this.downAt || !this.inputEnabled) return;
       const moved = Math.hypot(e.clientX - this.downAt.x, e.clientY - this.downAt.y);
       this.downAt = null;
@@ -639,6 +752,8 @@ export class IsoWorld {
     window.addEventListener('resize', resize);
     el.addEventListener('pointerdown', pd);
     el.addEventListener('pointerup', pu);
+    el.addEventListener('pointercancel', pu);
+    el.addEventListener('pointermove', pm);
     el.addEventListener('wheel', wheel, { passive: false });
     this.disposers.push(() => {
       window.removeEventListener('keydown', kd);
@@ -647,6 +762,8 @@ export class IsoWorld {
       window.removeEventListener('resize', resize);
       el.removeEventListener('pointerdown', pd);
       el.removeEventListener('pointerup', pu);
+      el.removeEventListener('pointercancel', pu);
+      el.removeEventListener('pointermove', pm);
       el.removeEventListener('wheel', wheel);
     });
   }
@@ -775,7 +892,12 @@ export class IsoWorld {
   private updatePlayer(dt: number) {
     let mx = 0;
     let mz = 0;
-    if (this.inputEnabled && this.keys.size) {
+    const stick = this.inputEnabled && Math.hypot(this.stick.x, this.stick.y) > 0.2;
+    if (stick) {
+      // Mismos ejes isométricos que las flechas
+      mx = this.stick.x + this.stick.y;
+      mz = this.stick.y - this.stick.x;
+    } else if (this.inputEnabled && this.keys.size) {
       // Ejes isométricos: arriba en pantalla = (-1,-1), derecha = (1,-1)
       if (this.keys.has('w') || this.keys.has('arrowup')) { mx -= 1; mz -= 1; }
       if (this.keys.has('s') || this.keys.has('arrowdown')) { mx += 1; mz += 1; }
@@ -796,7 +918,7 @@ export class IsoWorld {
     const moving = len > 0;
     if (moving) {
       const speed = 4.2 * dt;
-      const step = Math.min(speed, this.path.length && !this.keys.size ? len : speed);
+      const step = Math.min(speed, this.path.length && !this.keys.size && !stick ? len : speed);
       const dx = (mx / len) * step;
       const dz = (mz / len) * step;
       const r = 0.28;
@@ -908,6 +1030,7 @@ export class IsoWorld {
     this.inputEnabled = on;
     if (!on) {
       this.keys.clear();
+      this.stick = { x: 0, y: 0 };
       this.path = [];
       this.pendingInteract = null;
       this.moveMarker.visible = false;

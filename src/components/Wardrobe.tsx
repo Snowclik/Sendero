@@ -100,9 +100,9 @@ export const Wardrobe: FunctionalComponent<{
       <div className="absolute inset-x-0 bottom-0 h-[38%]" style={{ background: 'repeating-linear-gradient(90deg,#f3d9b8 0 60px,#eecba4 60px 120px)' }} />
       <div className="absolute left-[6%] top-[10%] w-40 h-56 rounded-[28px] bg-white/40 border-8 border-white/50" />
 
-      <div className="relative h-full flex flex-col lg:flex-row items-stretch gap-4 p-4 lg:p-8">
+      <div className="relative h-full flex flex-col lg:flex-row shortwide:flex-row items-stretch gap-4 p-4 lg:p-8 short:!p-2 short:gap-2">
         {/* Personaje */}
-        <div className="relative flex-1 min-h-[280px] flex items-end justify-center">
+        <div className="relative flex-1 min-h-[280px] short:min-h-0 shortnarrow:hidden flex items-end justify-center">
           <span className="absolute top-0 left-0 inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#fffaf0] border-[3px] border-white shadow-[0_4px_0_rgba(146,112,52,.22)] font-black text-slate-700">
             <Shirt className="w-5 h-5 text-sky-600" /> Vestuario
           </span>
@@ -119,7 +119,7 @@ export const Wardrobe: FunctionalComponent<{
         </div>
 
         {/* Panel de ropa */}
-        <div className="cozy-panel w-full lg:w-[520px] p-4 flex flex-col gap-3 max-h-full overflow-hidden">
+        <div className="cozy-panel w-full lg:w-[520px] shortwide:w-[min(480px,56vw)] p-4 short:p-2 flex flex-col gap-3 short:gap-1.5 max-h-full overflow-hidden">
           <div className="flex items-center justify-center gap-1.5 flex-wrap">
             {CATEGORIES.map((c) => {
               const Icon = CAT_ICON[c.id];
@@ -131,16 +131,16 @@ export const Wardrobe: FunctionalComponent<{
                   aria-pressed={on}
                   title={c.name}
                   aria-label={c.name}
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${on ? 'bg-amber-400 text-white shadow-[0_4px_0_#b45309]' : 'bg-white text-slate-500 shadow-[0_4px_0_#e6d3ab]'}`}
+                  className={`w-12 h-12 short:w-9 short:h-9 rounded-2xl flex items-center justify-center transition-all ${on ? 'bg-amber-400 text-white shadow-[0_4px_0_#b45309]' : 'bg-white text-slate-500 shadow-[0_4px_0_#e6d3ab]'}`}
                 >
                   {Icon ? <Icon className="w-6 h-6" /> : <ItemThumb cat="pants" id="x" color={on ? 0xffffff : 0x64748b} size={30} />}
                 </button>
               );
             })}
           </div>
-          <div className="flex justify-center"><span className="cozy-ribbon !bg-sky-500 text-sm">{CATEGORIES.find((c) => c.id === cat)!.name}</span></div>
+          <div className="flex justify-center short:hidden"><span className="cozy-ribbon !bg-sky-500 text-sm">{CATEGORIES.find((c) => c.id === cat)!.name}</span></div>
 
-          <div className="cozy-inset p-3 grid grid-cols-3 sm:grid-cols-4 gap-2.5 overflow-y-auto">
+          <div className="cozy-inset p-3 short:p-2 grid grid-cols-3 sm:grid-cols-4 gap-2.5 overflow-y-auto min-h-0">
             {WARDROBE[cat].map((item) => {
               const locked = !!item.unlock && !isUnlocked(item.unlock);
               const selected = draft[cat] === item.id;

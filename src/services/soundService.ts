@@ -6,127 +6,93 @@
  */
 
 let audioCtx: AudioContext | null = null;
+let master: GainNode | null = null;
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   if (!audioCtx) {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (AudioContextClass) {
-      audioCtx = new AudioContextClass();
-    }
+    if (!AudioContextClass) return null;
+    audioCtx = new AudioContextClass();
+    // Volumen general + compresor: se escucha claro en bocinas de celular sin saturar
+    const comp = audioCtx.createDynamicsCompressor();
+    comp.threshold.value = -18;
+    comp.ratio.value = 4;
+    master = audioCtx.createGain();
+    master.gain.value = 0.9;
+    master.connect(comp);
+    comp.connect(audioCtx.destination);
   }
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
-  }
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
   return audioCtx;
 }
 
+// Android y iOS dejan el audio "dormido" hasta el primer toque: lo despertamos en ese toque
+// para que el primer efecto no se pierda.
+if (typeof window !== 'undefined') {
+  const unlock = () => {
+    const ctx = getAudioContext();
+    if (ctx) {
+      const b = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = b;
+      src.connect(ctx.destination);
+      src.start(0);
+    }
+    window.removeEventListener('pointerdown', unlock, true);
+    window.removeEventListener('keydown', unlock, true);
+  };
+  window.addEventListener('pointerdown', unlock, true);
+  window.addEventListener('keydown', unlock, true);
+}
+
 /**
- * Sonido de acierto suave y cálido (Acorde mayor ascendente C5-E5-G5)
- * Diseñado para bajo nivel de excitación sensorial (Low-Arousal UI para TDAH)
+ * Un tono con ataque suave. Frecuencias entre ~600 y 2000 Hz: es lo que una bocina de celular
+ * reproduce bien (los graves casi no se oyen). Un armónico suave le da presencia sin sonar estridente.
  */
+function tone(freq: number, delay: number, dur: number, vol: number, opts: { type?: OscillatorType; glideTo?: number } = {}) {
+  const ctx = getAudioContext();
+  if (!ctx || !master) return;
+  const t = ctx.currentTime + 0.02 + delay;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  gain.connect(master);
+  for (const [mult, part] of [[1, 1], [2, 0.25]] as const) {
+    const osc = ctx.createOscillator();
+    osc.type = opts.type ?? 'sine';
+    osc.frequency.setValueAtTime(freq * mult, t);
+    if (opts.glideTo) osc.frequency.exponentialRampToValueAtTime(opts.glideTo * mult, t + dur);
+    const g = ctx.createGain();
+    g.gain.value = part;
+    osc.connect(g);
+    g.connect(gain);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+  }
+}
+
+/** Acierto: acorde mayor ascendente (Do-Mi-Sol-Do), cálido. */
 export function playSuccessSound() {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
-  const now = ctx.currentTime;
-
-  notes.forEach((freq, idx) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, now + idx * 0.08);
-
-    gain.gain.setValueAtTime(0.001, now + idx * 0.08);
-    gain.gain.exponentialRampToValueAtTime(0.12, now + idx * 0.08 + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.08 + 0.35);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(now + idx * 0.08);
-    osc.stop(now + idx * 0.08 + 0.36);
-  });
+  [1046.5, 1318.5, 1568, 2093].forEach((f, i) => tone(f, i * 0.09, 0.42, 0.32));
 }
 
-/**
- * Sonido sutil de pulsación táctil (Pop suave de burbuja)
- */
+/** Toque: "pop" corto de burbuja. */
 export function playClickSound() {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  const now = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(440, now);
-  osc.frequency.exponentialRampToValueAtTime(220, now + 0.06);
-
-  gain.gain.setValueAtTime(0.08, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
-
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.start(now);
-  osc.stop(now + 0.07);
+  tone(1200, 0, 0.09, 0.3, { glideTo: 700 });
 }
 
-/**
- * Sonido de micro-paso completado
- */
+/** Paso completado: dos notas que suben. */
 export function playStepCompleteSound() {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  const now = ctx.currentTime;
-  const notes = [440, 554.37]; // A4, C#5
-  notes.forEach((freq, idx) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, now + idx * 0.07);
-
-    gain.gain.setValueAtTime(0.001, now + idx * 0.07);
-    gain.gain.exponentialRampToValueAtTime(0.09, now + idx * 0.07 + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.07 + 0.25);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(now + idx * 0.07);
-    osc.stop(now + idx * 0.07 + 0.26);
-  });
+  tone(880, 0, 0.22, 0.3, { type: 'triangle' });
+  tone(1318.5, 0.09, 0.3, 0.3, { type: 'triangle' });
 }
 
-/**
- * Tono socrático suave (campana de reflexión)
- */
+/** Pista: campanita suave. */
 export function playHintSound() {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  const now = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(587.33, now); // D5
-
-  gain.gain.setValueAtTime(0.001, now);
-  gain.gain.exponentialRampToValueAtTime(0.1, now + 0.03);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
-
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.start(now);
-  osc.stop(now + 0.65);
+  tone(1174.7, 0, 0.7, 0.26);
+  tone(1760, 0.05, 0.5, 0.12);
 }
 
 // ============================================================================

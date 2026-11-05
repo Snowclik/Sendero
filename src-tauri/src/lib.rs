@@ -56,6 +56,11 @@ fn exit_app(app: AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // En Android el error de arranque no llega al log: lo guardamos para poder leerlo con adb.
+    #[cfg(target_os = "android")]
+    std::panic::set_hook(Box::new(|info| {
+        let _ = std::fs::write("/data/data/com.hack4edu.sendero/files/panic.txt", info.to_string());
+    }));
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             save_offline_progress,

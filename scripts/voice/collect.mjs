@@ -4,7 +4,7 @@ import { writeFileSync } from 'node:fs';
 import { MISSIONS, SKILLS } from '../../src/data/missionsData.ts';
 import { LINES } from '../../src/data/lines.ts';
 import { ACHIEVEMENTS } from '../../src/data/achievements.ts';
-import { templateFragments } from '../../src/game/problems.ts';
+import { FRACTION_NAMES, templateFragments } from '../../src/game/problems.ts';
 
 const set = new Set();
 const add = (s) => s && templateFragments(s).forEach((f) => set.add(f));
@@ -19,7 +19,7 @@ for (const m of MISSIONS) {
     if (s.type === 'read') {
       d.options.forEach((o) => add(o.text));
       Object.values(d.why ?? {}).forEach(add);
-      d.variants.forEach((v) => { add(v.question); add(v.explain); v.blocks.forEach((b) => add(b.text)); });
+      d.variants.forEach((v) => { add(v.question); add(v.explain); v.blocks.forEach((b) => add(b.text)); (v.options ?? []).forEach((o) => add(o.text)); });
     }
     if (s.type === 'sift') d.pairs.forEach((p) => { add(p.rumor.content); add(p.reliable.content); });
     if (s.type === 'order') d.items.forEach((i) => add(i.text));
@@ -27,6 +27,7 @@ for (const m of MISSIONS) {
 }
 for (const v of Object.values(LINES)) (Array.isArray(v) ? v : [v]).forEach(add);
 ACHIEVEMENTS.forEach((a) => add(a.name));
+Object.values(FRACTION_NAMES).forEach((f) => set.add(f));
 // Retos de Chispa (brain.ts)
 add('¡Reto nuevo! Lo armé pensando en ti.');
 SKILLS.forEach((s) => add(`Hoy practicamos: ${s.name}.`));

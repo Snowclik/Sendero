@@ -37,24 +37,25 @@ export const AchievementsModal: FunctionalComponent<{ isOpen: boolean; onClose: 
   const Tab = ({ id, label, Icon }: { id: typeof tab; label: string; Icon: any }) => (
     <button
       onClick={() => { playClickSound(); setTab(id); }}
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-sm transition-all ${tab === id ? 'bg-sky-500 text-white shadow-[0_4px_0_#0369a1]' : 'bg-white text-slate-600 shadow-[0_4px_0_#e6d3ab]'}`}
+      className={`flex items-center gap-2 px-4 py-2.5 short:py-1.5 rounded-2xl font-black text-sm transition-all ${tab === id ? 'bg-sky-500 text-white shadow-[0_4px_0_#0369a1]' : 'bg-white text-slate-600 shadow-[0_4px_0_#e6d3ab]'}`}
     >
       <Icon className="w-5 h-5" /> {label}
     </button>
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-sky-100/50 backdrop-blur-sm overflow-y-auto">
-      <div className="cozy-panel relative w-full max-w-4xl my-6 p-5 sm:p-6 animate-fadeIn">
-        <button onClick={onClose} className="absolute top-4 right-4 w-10 h-10 rounded-2xl bg-white shadow-[0_4px_0_#e6d3ab] flex items-center justify-center text-slate-500" aria-label="Cerrar logros">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-sky-100/50 backdrop-blur-sm">
+      <div className="cozy-panel relative w-full max-w-4xl max-h-full flex flex-col p-4 sm:p-6 short:!p-2 animate-fadeIn">
+        <button onClick={onClose} className="absolute top-3 right-3 short:top-2 short:right-2 z-10 w-10 h-10 rounded-2xl bg-white shadow-[0_4px_0_#e6d3ab] flex items-center justify-center text-slate-500" aria-label="Cerrar logros">
           <X className="w-5 h-5" />
         </button>
-        <div className="flex justify-center mb-4"><span className="cozy-ribbon text-lg">Mis logros</span></div>
-        <div className="flex justify-center gap-2 mb-5">
+        <div className="flex justify-center mb-4 short:hidden"><span className="cozy-ribbon text-lg">Mis logros</span></div>
+        <div className="flex justify-center gap-2 mb-4 short:mb-2 pr-12 pl-1 sm:px-12">
           <Tab id="logros" label={`Logros ${earned}/${ACHIEVEMENTS.length}`} Icon={Trophy} />
           <Tab id="aprendo" label="Lo que aprendo" Icon={Brain} />
         </div>
 
+        <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 pb-1">
         {tab === 'logros' && (
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
             {ACHIEVEMENTS.map((a) => {
@@ -125,6 +126,7 @@ export const AchievementsModal: FunctionalComponent<{ isOpen: boolean; onClose: 
           </div>
           );
         })()}
+        </div>
       </div>
     </div>
   );

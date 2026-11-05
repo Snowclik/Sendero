@@ -3,6 +3,14 @@ export default {
   content: ['./src/**/*.{astro,html,js,jsx,md,mdx,svelte,ts,tsx,vue}'],
   theme: {
     extend: {
+      // Celulares: horizontal (poca altura) y pantalla exterior del Galaxy Z Flip
+      screens: {
+        short: { raw: '(max-height: 560px)' },
+        shortwide: { raw: '(max-height: 560px) and (min-width: 600px)' },
+        shortnarrow: { raw: '(max-height: 560px) and (max-width: 599px)' },
+        narrow: { raw: '(max-width: 480px)' },
+        tiny: { raw: '(max-width: 360px)' },
+      },
       colors: {
         solar: {
           sky: '#0284c7',       // sky-600

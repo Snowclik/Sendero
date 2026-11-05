@@ -13,16 +13,16 @@ const AVATAR_TONE: Record<AvatarIcon, string> = {
 };
 
 const Stage = ({ children, say }: { children: any; say: string }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-sky-100/50 backdrop-blur-sm overflow-y-auto">
-    <div className="w-full max-w-xl my-6 flex flex-col gap-3 animate-fadeIn">
-      <div className="flex items-end gap-2 px-2">
+  <div className="fixed inset-0 z-50 flex justify-center p-4 short:p-2 bg-sky-100/50 backdrop-blur-sm overflow-y-auto">
+    <div className="w-full max-w-xl my-auto py-2 flex flex-col gap-3 short:gap-1 animate-fadeIn">
+      <div className="flex items-end gap-2 px-2 short:hidden">
         <SquirrelArt mood="happy" size={86} />
         <div className="relative mb-4 rounded-2xl bg-white border-[3px] border-[#f1e4c6] shadow-[0_4px_0_#e6d3ab] px-4 py-2.5">
           <span className="absolute -left-2 bottom-3 w-4 h-4 bg-white border-l-[3px] border-b-[3px] border-[#f1e4c6] rotate-45" />
           <p className="font-bold text-slate-700">{say}</p>
         </div>
       </div>
-      <div className="cozy-panel p-5 sm:p-6">{children}</div>
+      <div className="cozy-panel p-5 sm:p-6 short:!p-3">{children}</div>
     </div>
   </div>
 );
@@ -43,7 +43,7 @@ export const ProfileScreen: FunctionalComponent<{
 
   return (
     <Stage say={creating ? LINES.hello : LINES.whoPlays}>
-      <div className="flex justify-center -mt-1 mb-4"><span className="cozy-ribbon text-lg">Sendero</span></div>
+      <div className="flex justify-center -mt-1 mb-4 short:mb-2"><span className="cozy-ribbon text-lg short:text-sm">Sendero</span></div>
 
       {!creating ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -120,15 +120,16 @@ export const StoryScreen: FunctionalComponent<{ onDone: () => void }> = ({ onDon
   const Icon = STORY_ICONS[i];
   const last = i === LINES.story.length - 1;
   return (
-    <div className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-sky-100/60 backdrop-blur-sm">
-      <div key={i} className="cozy-panel w-full max-w-md p-6 flex flex-col items-center gap-5 text-center animate-fadeIn">
+    <div className="fixed inset-0 z-[55] flex justify-center p-4 short:p-2 bg-sky-100/60 backdrop-blur-sm overflow-y-auto">
+      <div key={i} className="cozy-panel my-auto w-full max-w-md p-6 short:p-3 flex flex-col items-center gap-5 short:gap-2 text-center shortwide:max-w-xl shortwide:grid shortwide:grid-cols-[auto_1fr] shortwide:text-left animate-fadeIn">
         <div className="relative">
-          <span className={`w-28 h-28 rounded-[32px] text-white flex items-center justify-center ${STORY_TONE[i]} ${i === 1 ? 'anim-bob' : ''}`}>
+          <span className={`w-28 h-28 short:w-20 short:h-20 rounded-[32px] text-white flex items-center justify-center ${STORY_TONE[i]} ${i === 1 ? 'anim-bob' : ''}`}>
             <Icon className="w-16 h-16" />
           </span>
           <span className="absolute -right-8 -bottom-3"><SquirrelArt mood={i === 1 ? 'idle' : 'happy'} size={72} /></span>
         </div>
-        <p className="text-2xl font-black text-slate-800 leading-snug">{text}</p>
+        <div className="flex flex-col items-center shortwide:items-start gap-3 short:gap-2">
+        <p className="text-2xl short:text-lg font-black text-slate-800 leading-snug">{text}</p>
         <button
           onClick={() => sayText(text, { user: true })}
           className="w-12 h-12 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center"
@@ -142,6 +143,7 @@ export const StoryScreen: FunctionalComponent<{ onDone: () => void }> = ({ onDon
         <GlassButton variant="primary" size="lg" onClick={() => { playClickSound(); last ? onDone() : setI(i + 1); }}>
           {last ? '¡Vamos!' : 'Siguiente'}
         </GlassButton>
+        </div>
       </div>
     </div>
   );
