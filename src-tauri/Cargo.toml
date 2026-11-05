@@ -1,0 +1,26 @@
+[package]
+name = "sendero"
+version = "1.0.0"
+description = "Videojuego Educativo Offline-First para Emergencias y Continuidad Escolar"
+authors = ["Hack4Edu Team"]
+edition = "2021"
+
+# lib + bin: necesario para compilar también a Android (tauri android build)
+[lib]
+name = "sendero_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde_json = "1.0"
+
+# Binario pequeño para equipos rurales con poco disco y RAM
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
