@@ -1,9 +1,10 @@
 import type { FunctionalComponent } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { ArrowLeft, BookOpen, CloudRain, Compass, Heart, LifeBuoy, Lock, Plus, Shield, Smile, Sun, TreePine } from 'lucide-preact';
 import { GlassButton } from './ui/GlassButton';
 import { SquirrelArt } from './ui/Art';
-import { playClickSound } from '../services/soundService';
+import { playClickSound, sayText } from '../services/soundService';
+import { LINES } from '../data/lines';
 import type { AvatarIcon, Mood, StudentProfile } from '../services/storageService';
 
 export const AVATARS: Record<AvatarIcon, any> = { Compass, Shield, BookOpen, TreePine, Sun, Heart };
@@ -36,9 +37,12 @@ export const ProfileScreen: FunctionalComponent<{
   const [avatar, setAvatar] = useState<AvatarIcon>('Compass');
   const valid = name.trim().length >= 2;
   const Preview = AVATARS[avatar];
+  useEffect(() => {
+    sayText(creating ? LINES.hello : LINES.whoPlays);
+  }, [creating]);
 
   return (
-    <Stage say={creating ? '¡Hola! Soy Chispa. ¿Tu apodo?' : '¿Quién juega hoy?'}>
+    <Stage say={creating ? LINES.hello : LINES.whoPlays}>
       <div className="flex justify-center -mt-1 mb-4"><span className="cozy-ribbon text-lg">Sendero</span></div>
 
       {!creating ? (
@@ -112,7 +116,11 @@ export const MOODS: { id: Mood; label: string; full: string; Icon: any; tone: st
   { id: 'ayuda', label: 'Necesito ayuda', full: 'Estoy en albergue / necesito hablar con mi maestro', Icon: LifeBuoy, tone: 'bg-rose-400 shadow-[0_6px_0_#e11d48]' },
 ];
 
-export const CheckInModal: FunctionalComponent<{ name: string; onPick: (m: Mood) => void }> = ({ name, onPick }) => (
+export const CheckInModal: FunctionalComponent<{ name: string; onPick: (m: Mood) => void }> = ({ name, onPick }) => {
+  useEffect(() => {
+    sayText(LINES.howAreYou);
+  }, []);
+  return (
   <Stage say={`¿Cómo estás, ${name}?`}>
     <div className="grid grid-cols-3 gap-3">
       {MOODS.map(({ id, label, full, Icon, tone }) => (
@@ -125,4 +133,5 @@ export const CheckInModal: FunctionalComponent<{ name: string; onPick: (m: Mood)
       ))}
     </div>
   </Stage>
-);
+  );
+};

@@ -1,64 +1,75 @@
 import type { FunctionalComponent } from 'preact';
 import { createPortal } from 'preact/compat';
-import { useEffect, useRef, useState } from 'preact/hooks';
-import { Check, GraduationCap, Lock, MousePointerClick, QrCode, Sun, Tent, Volume2, WifiOff, Wind } from 'lucide-preact';
+import { useEffect, useErrorBoundary, useRef, useState } from 'preact/hooks';
+import { Award, Check, Lock, MousePointerClick, RotateCcw, Sun, Tent, Trophy, Volume2, VolumeX, WifiOff, Wind } from 'lucide-preact';
 import { IsoWorld, type StationState } from '../game/IsoWorld';
 import { MissionPanel, STATION_ICONS, type MissionResult } from './MissionPanel';
-import { TeacherView } from './TeacherView';
-import { PassportModal } from './PassportModal';
+import { AchievementsModal } from './AchievementsModal';
 import { BreathingModal } from './ui/BreathingModal';
 import { GlassButton } from './ui/GlassButton';
 import { SquirrelArt } from './ui/Art';
 import { AVATARS, CheckInModal, MOODS, ProfileScreen } from './Onboarding';
-import { MISSIONS, getBadges, isUnlocked, missionById, nextMission, type Mission, type MissionId } from '../data/missionsData';
+import { MISSIONS, isUnlocked, missionById, nextMission, type Mission, type MissionId, type SkillId } from '../data/missionsData';
+import { ACHIEVEMENTS } from '../data/achievements';
+import { LINES } from '../data/lines';
+import { fill, speechParts, type Params } from '../game/problems';
 import {
-  MAX_SUNS, createProfile, isTauriEnvironment, loadStore, normalizeProfile, saveStore,
+  MAX_SUNS, createProfile, isTauriEnvironment, loadStore, normalizeProfile, recordSkill, saveStore,
   type Mood, type SaveStore, type StudentProfile,
 } from '../services/storageService';
-import { playClickSound, speakLocalText } from '../services/soundService';
+import { isVoiceEnabled, onListen, playClickSound, playSuccessSound, say, sayText, sayTpl, setVoiceEnabled } from '../services/soundService';
 
-const clamp100 = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
 const NAMES = Object.fromEntries(MISSIONS.map((m) => [m.id, m.stationName])) as Record<MissionId, string>;
 const roundBtn = 'w-12 h-12 rounded-2xl bg-[#fffaf0] border-[3px] border-white shadow-[0_5px_0_rgba(146,112,52,.22)] flex items-center justify-center text-slate-700 active:translate-y-[3px] active:shadow-[0_2px_0_rgba(146,112,52,.22)] transition-all';
 const Cap = ({ k }: { k: string }) => (
   <kbd className="min-w-[26px] h-[26px] px-1 rounded-lg bg-white border-2 border-[#f1e4c6] shadow-[0_3px_0_#e6d3ab] flex items-center justify-center text-xs font-black text-slate-600">{k}</kbd>
 );
 
-export const GameApp: FunctionalComponent = () => {
+/** Logros ganados que el niño todavía no vio anunciados. */
+const unseen = (p: StudentProfile) => ACHIEVEMENTS.filter((a) => a.earned(p) && !p.achievementsSeen.includes(a.id));
+
+const Game: FunctionalComponent = () => {
   const mountRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<IsoWorld | null>(null);
   const interactRef = useRef<(id: MissionId) => void>(() => {});
+  const loadedRef = useRef(false);
 
   const [store, setStore] = useState<SaveStore | null>(null);
   const [phase, setPhase] = useState<'profile' | 'checkin' | 'play'>('profile');
-  const [view, setView] = useState<'student' | 'teacher'>('student');
   const [near, setNear] = useState<MissionId | null>(null);
   const [mission, setMission] = useState<Mission | null>(null);
-  const [sqLine, setSqLine] = useState<string | null>(null); // frase temporal de Chispa (reemplaza los avisos)
+  const [sqLine, setSqLine] = useState<{ tpl: string; params: Params } | null>(null);
+  const [toast, setToast] = useState<string | null>(null); // logro nuevo
   const [anchor, setAnchor] = useState<HTMLDivElement | null>(null);
-  const [passport, setPassport] = useState(false);
+  const [logros, setLogros] = useState(false);
   const [breath, setBreath] = useState<number | null>(null);
+  const [voice, setVoice] = useState(isVoiceEnabled());
   const [webglError, setWebglError] = useState(false);
 
   const student = store?.profiles.find((p) => p.id === store.activeId) ?? null;
   const suns = student?.currentSunEnergy ?? MAX_SUNS;
   const calm = student?.emotionalStatus === 'inquieto';
   const objective = student ? nextMission(student.completedMissions) : null;
-  const resting = phase === 'play' && view === 'student' && !mission && suns === 0;
+  const resting = phase === 'play' && !mission && suns === 0;
 
-  // --- Persistencia --------------------------------------------------------
+  // --- Persistencia: un solo lugar guarda, y los cambios se aplican sobre el estado más reciente ---
   useEffect(() => {
-    loadStore().then(setStore);
+    loadStore().then((s) => {
+      setStore(s);
+      loadedRef.current = true;
+    });
   }, []);
-  const commit = (next: SaveStore) => {
-    setStore(next);
-    saveStore(next);
-  };
-  const updateStudent = (fn: (p: StudentProfile) => StudentProfile) => {
-    if (!store || !student) return;
-    const updated = { ...fn(student), lastActiveAt: new Date().toISOString() };
-    commit({ ...store, profiles: store.profiles.map((p) => (p.id === updated.id ? updated : p)) });
-  };
+  useEffect(() => {
+    if (store && loadedRef.current) saveStore(store);
+  }, [store]);
+
+  const updateStudent = (fn: (p: StudentProfile) => StudentProfile) =>
+    setStore((prev) =>
+      prev?.activeId
+        ? { ...prev, profiles: prev.profiles.map((p) => (p.id === prev.activeId ? { ...fn(p), lastActiveAt: new Date().toISOString() } : p)) }
+        : prev
+    );
+  const bump = (k: keyof StudentProfile['stats'], n = 1) => updateStudent((p) => ({ ...p, stats: { ...p.stats, [k]: p.stats[k] + n } }));
 
   // --- Motor 3D ------------------------------------------------------------
   useEffect(() => {
@@ -66,6 +77,7 @@ export const GameApp: FunctionalComponent = () => {
     try {
       const w = new IsoWorld(mountRef.current, { onNear: setNear, onInteract: (id) => interactRef.current(id) });
       worldRef.current = w;
+      if (import.meta.env.DEV) (window as any).__world = w; // depuración
       setAnchor(w.squirrelAnchor);
       return () => {
         w.dispose();
@@ -86,7 +98,7 @@ export const GameApp: FunctionalComponent = () => {
     worldRef.current?.setStations(states, objective?.id ?? null, NAMES);
   }, [completedKey, student?.id]);
 
-  const inputOn = phase === 'play' && view === 'student' && !mission && !passport && breath === null && !resting;
+  const inputOn = phase === 'play' && !mission && !logros && breath === null && !resting;
   useEffect(() => worldRef.current?.setInputEnabled(inputOn), [inputOn]);
   useEffect(() => worldRef.current?.setCalm(calm), [calm]);
   useEffect(() => worldRef.current?.focusStation(mission?.id ?? null), [mission]);
@@ -95,14 +107,52 @@ export const GameApp: FunctionalComponent = () => {
     const t = setTimeout(() => setSqLine(null), 5000);
     return () => clearTimeout(t);
   }, [sqLine]);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // Estadísticas para logros escondidos: metros caminados y frases escuchadas
+  useEffect(() => {
+    const t = setInterval(() => {
+      const m = worldRef.current?.takeWalkedMeters() ?? 0;
+      if (m >= 1) bump('meters', Math.round(m));
+    }, 4000);
+    onListen(() => bump('listens'));
+    return () => clearInterval(t);
+  }, []);
+
+  // Anunciar logros nuevos (fuera de la pantalla final de misión, que ya los muestra)
+  useEffect(() => {
+    if (!student || mission) return;
+    const fresh = unseen(student);
+    if (!fresh.length) return;
+    playSuccessSound();
+    setToast(fresh[0].name);
+    sayTpl(LINES.achievement, { name: fresh[0].name });
+    updateStudent((p) => ({ ...p, achievementsSeen: [...p.achievementsSeen, ...fresh.map((a) => a.id)] }));
+  }, [student, mission]);
+
+  // La ardilla habla al llegar al mapa o cambiar de objetivo
+  const chispaLine = sqLine ?? { tpl: objective?.squirrelCall ?? LINES.allDone, params: {} };
+  const exploring = phase === 'play' && !!student && !mission && !resting;
+  useEffect(() => {
+    if (exploring && !sqLine) sayText(chispaLine.tpl);
+  }, [exploring, objective?.id]);
+
+  useEffect(() => {
+    if (resting) sayText(LINES.rest);
+  }, [resting]);
 
   // --- Entrar a una estación --------------------------------------------
   const tryStart = (id: MissionId) => {
     if (!student || !inputOn) return;
-    const done = student.completedMissions;
-    if (!isUnlocked(id, done)) {
+    if (!isUnlocked(id, student.completedMissions)) {
       const prev = MISSIONS[MISSIONS.findIndex((x) => x.id === id) - 1];
-      setSqLine(`¡Aún no! Primero: ${prev.stationName}.`);
+      const line = { tpl: LINES.locked, params: { station: prev.stationName } };
+      setSqLine(line);
+      say(speechParts(line.tpl, line.params));
       return;
     }
     if (suns === 0) return;
@@ -115,6 +165,7 @@ export const GameApp: FunctionalComponent = () => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (import.meta.env.DEV && e.shiftKey && e.key === 'S') updateStudent((p) => ({ ...p, currentSunEnergy: MAX_SUNS })); // solo desarrollo
       if (tag === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
       if (near && ['e', 'E', 'Enter', ' '].includes(e.key)) {
         e.preventDefault();
@@ -128,31 +179,24 @@ export const GameApp: FunctionalComponent = () => {
   // --- Resultado de misión ----------------------------------------------
   const completeMission = (r: MissionResult): string[] => {
     if (!student || !mission) return [];
-    const isMath = mission.subject === 'Matemáticas';
-    const before = new Set(getBadges(student).filter((b) => b.earned).map((b) => b.id));
-    const t = student.talentScores;
+    const replay = student.completedMissions.includes(mission.id);
     const next: StudentProfile = {
       ...student,
-      completedMissions: student.completedMissions.includes(mission.id) ? student.completedMissions : [...student.completedMissions, mission.id],
+      completedMissions: replay ? student.completedMissions : [...student.completedMissions, mission.id],
       currentSunEnergy: Math.max(0, student.currentSunEnergy - 1),
       duoModeCompleted: student.duoModeCompleted || r.duo,
       resilienceEarned: student.resilienceEarned || r.mistakes > 0,
-      struggles: {
-        math: student.struggles.math + (isMath ? r.struggledSteps : 0),
-        reading: student.struggles.reading + (isMath ? 0 : r.struggledSteps),
-      },
-      // Talentos: suben solo con evidencia concreta de la misión
-      talentScores: {
-        perseverance: clamp100(t.perseverance + (r.mistakes > 0 ? 15 : 8)),
-        criticalThinking: clamp100(t.criticalThinking + (mission.id === 'mision-2-rumor' ? 25 : 6)),
-        collaboration: clamp100(t.collaboration + (r.duo ? 35 : 0)),
-        emergencyCalm: clamp100(t.emergencyCalm + 8),
-        mathProblemSolving: clamp100(t.mathProblemSolving + (isMath ? 22 : 0)),
-        readingComprehension: clamp100(t.readingComprehension + (isMath ? 0 : 22)),
+      stats: {
+        ...student.stats,
+        replays: student.stats.replays + (replay ? 1 : 0),
+        missionsNoHint: student.stats.missionsNoHint + (r.hints === 0 ? 1 : 0),
+        missionsPerfect: student.stats.missionsPerfect + (r.mistakes === 0 ? 1 : 0),
       },
     };
-    updateStudent(() => next);
-    return getBadges(next).filter((b) => b.earned && !before.has(b.id)).map((b) => b.name);
+    const fresh = unseen(next);
+    next.achievementsSeen = [...next.achievementsSeen, ...fresh.map((a) => a.id)];
+    updateStudent((p) => ({ ...next, skills: p.skills, stats: { ...next.stats, chispaTaps: p.stats.chispaTaps, listens: p.stats.listens, meters: p.stats.meters } }));
+    return fresh.map((a) => a.name);
   };
 
   const exitMission = () => {
@@ -164,7 +208,10 @@ export const GameApp: FunctionalComponent = () => {
     updateStudent((p) => ({ ...p, emotionalStatus: m }));
     setPhase('play');
     if (m === 'inquieto') setBreath(10);
-    if (m === 'ayuda') setSqLine('Le avisé a tu maestro.');
+    if (m === 'ayuda') {
+      setSqLine({ tpl: LINES.helpSaved, params: {} });
+      sayText(LINES.helpSaved);
+    }
   };
 
   // --- Render --------------------------------------------------------------
@@ -172,8 +219,7 @@ export const GameApp: FunctionalComponent = () => {
   const nearLocked = !!(near && student && !isUnlocked(near, student.completedMissions));
   const MoodIcon = MOODS.find((m) => m.id === student?.emotionalStatus)?.Icon ?? Sun;
   const Avatar = student ? AVATARS[student.avatarIcon] : null;
-  const exploring = phase === 'play' && !!student && view === 'student' && !mission && !resting;
-  const chispaSays = sqLine ?? objective?.squirrelCall ?? '¡Salvamos el valle!';
+  const chispaText = fill(chispaLine.tpl, chispaLine.params);
 
   return (
     <div className={`fixed inset-0 overflow-hidden select-none bg-sky-100 ${calm ? 'calm' : ''}`}>
@@ -181,43 +227,45 @@ export const GameApp: FunctionalComponent = () => {
 
       {webglError && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-slate-700 font-semibold">
-          Este equipo no puede mostrar el mapa 3D. Pide al maestro las fichas impresas de las misiones.
+          Este equipo no puede mostrar el mapa 3D.
         </div>
       )}
 
-      {/* ===== Globo de Chispa sobre su cabeza en el mapa ===== */}
+      {/* Globo de Chispa sobre su cabeza en el mapa */}
       {exploring && anchor && !nearMission &&
         createPortal(
-          <button
-            onClick={() => speakLocalText(chispaSays)}
-            className="absolute bottom-2 left-0 -translate-x-1/2 w-max max-w-[260px] rounded-2xl bg-white border-[3px] border-[#f1e4c6] shadow-[0_5px_0_#e6d3ab] px-3 py-2 text-left animate-fadeIn"
-            aria-label={`Chispa dice: ${chispaSays}`}
-          >
+          // El globo deja pasar los clics al mapa; solo el altavoz es tocable
+          <div className="absolute bottom-2 left-0 -translate-x-1/2 w-max max-w-[260px] rounded-2xl bg-white border-[3px] border-[#f1e4c6] shadow-[0_5px_0_#e6d3ab] pl-3 pr-1.5 py-1.5 text-left animate-fadeIn pointer-events-none">
             <span className="absolute left-1/2 -bottom-[9px] -translate-x-1/2 w-4 h-4 bg-white border-r-[3px] border-b-[3px] border-[#f1e4c6] rotate-45" />
-            <span className="flex items-start gap-1.5">
-              <span className="text-[14px] font-bold text-slate-700 leading-snug">{chispaSays}</span>
-              <Volume2 className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
+            <span className="flex items-center gap-1.5">
+              <span className="text-[14px] font-bold text-slate-700 leading-snug">{chispaText}</span>
+              <button
+                onClick={() => { bump('chispaTaps'); say(speechParts(chispaLine.tpl, chispaLine.params), { user: true }); }}
+                className="pointer-events-auto shrink-0 w-8 h-8 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center"
+                aria-label={`Escuchar a Chispa: ${chispaText}`}
+              >
+                <Volume2 className="w-4 h-4" />
+              </button>
             </span>
-          </button>,
+          </div>,
           anchor
         )}
 
-      {/* ===== HUD SUPERIOR (elementos flotantes de juego) ===== */}
+      {/* HUD superior */}
       {phase === 'play' && student && (
         <header className="fixed z-40 top-3 inset-x-3 flex items-start justify-between gap-2 pointer-events-none">
-          <button onClick={() => { setMission(null); setPhase('profile'); }} className="pointer-events-auto flex items-center gap-2 group" title="Cambiar de explorador">
+          <button onClick={() => { setMission(null); setPhase('profile'); }} className="pointer-events-auto flex items-center gap-2" title="Cambiar de explorador">
             <span className="w-14 h-14 rounded-full bg-sky-400 border-4 border-white shadow-[0_5px_0_rgba(3,105,161,.35)] flex items-center justify-center text-white">
               {Avatar && <Avatar className="w-7 h-7" />}
             </span>
             <span className="hidden sm:flex flex-col items-start">
               <span className="px-3 py-1 rounded-xl bg-[#fffaf0] border-[3px] border-white shadow-[0_4px_0_rgba(146,112,52,.22)] font-black text-slate-800 max-w-[140px] truncate">{student.name}</span>
               <span className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500 text-white text-[10px] font-black tracking-wide" title={isTauriEnvironment() ? 'Motor nativo Tauri + Rust' : 'Navegador local'}>
-                <WifiOff className="w-3 h-3" /> 100% OFFLINE NATIVO
+                <WifiOff className="w-3 h-3" /> 100% OFFLINE
               </span>
             </span>
           </button>
 
-          {/* Energía solar del campamento: 3 soles por día */}
           <div className="pointer-events-auto flex items-center gap-1 px-3 py-2 rounded-2xl bg-[#fffaf0] border-[3px] border-white shadow-[0_5px_0_rgba(146,112,52,.22)]" aria-label={`Energía solar: ${suns} de 3`} title="Energía solar del campamento">
             {Array.from({ length: MAX_SUNS }).map((_, i) => (
               <Sun key={i} className={`w-8 h-8 ${i < suns ? 'text-amber-500 fill-amber-300' : 'text-[#e6d3ab]'}`} />
@@ -228,26 +276,27 @@ export const GameApp: FunctionalComponent = () => {
             <button onClick={() => setPhase('checkin')} className={roundBtn} title="¿Cómo me siento?" aria-label="Check-in emocional">
               <MoodIcon className="w-6 h-6" />
             </button>
-            <button onClick={() => setPassport(true)} className={roundBtn} title="Mi Pasaporte Escolar" aria-label="Mi Pasaporte Escolar">
-              <QrCode className="w-6 h-6 text-sky-600" />
+            <button onClick={() => { setVoiceEnabled(!voice); setVoice(!voice); }} className={roundBtn} title={voice ? 'Silenciar voz' : 'Activar voz'} aria-label={voice ? 'Silenciar voz' : 'Activar voz'} aria-pressed={!voice}>
+              {voice ? <Volume2 className="w-6 h-6 text-sky-600" /> : <VolumeX className="w-6 h-6 text-slate-400" />}
             </button>
-            <button
-              onClick={() => setView(view === 'student' ? 'teacher' : 'student')}
-              className={`${roundBtn} ${view === 'teacher' ? '!bg-indigo-500 !text-white' : ''}`}
-              title={view === 'student' ? 'Vista Maestro (Centro Docente Offline)' : 'Vista Estudiante (Juego)'}
-              aria-label={view === 'student' ? 'Vista Maestro' : 'Vista Estudiante'}
-              aria-pressed={view === 'teacher'}
-            >
-              <GraduationCap className="w-6 h-6" />
+            <button onClick={() => setLogros(true)} className={roundBtn} title="Mis logros" aria-label="Mis logros">
+              <Trophy className="w-6 h-6 text-amber-500" />
             </button>
           </div>
         </header>
       )}
 
-      {/* ===== HUD DE EXPLORACIÓN ===== */}
+      {/* Logro nuevo */}
+      {toast && (
+        <div role="status" className="fixed z-50 top-20 left-1/2 -translate-x-1/2 flex items-center gap-3 pl-2 pr-5 py-2 rounded-full bg-amber-300 text-amber-950 shadow-[0_6px_0_#d97706] anim-hop">
+          <span className="w-11 h-11 rounded-full bg-white/60 flex items-center justify-center"><Award className="w-6 h-6" /></span>
+          <span className="font-black">¡Logro nuevo! {toast}</span>
+        </div>
+      )}
+
+      {/* HUD de exploración */}
       {exploring && (
         <>
-          {/* Rastreador de estaciones: medallones en vez de texto */}
           <div className="fixed z-10 left-3 bottom-3 flex items-center gap-1.5 px-2.5 py-2 rounded-[22px] bg-[#fffaf0] border-[3px] border-white shadow-[0_5px_0_rgba(146,112,52,.22)]">
             {MISSIONS.map((m, i) => {
               const Icon = STATION_ICONS[m.id];
@@ -295,8 +344,8 @@ export const GameApp: FunctionalComponent = () => {
         </>
       )}
 
-      {/* ===== MISIÓN ACTIVA ===== */}
-      {mission && student && view === 'student' && (
+      {/* Misión activa */}
+      {mission && student && (
         <MissionPanel
           key={mission.id}
           mission={mission}
@@ -306,10 +355,13 @@ export const GameApp: FunctionalComponent = () => {
           onExit={exitMission}
           onComplete={completeMission}
           onHintUsed={() => updateStudent((p) => ({ ...p, hintsUsed: p.hintsUsed + 1 }))}
+          onSkill={(skill: SkillId, ok, firstTry) => updateStudent((p) => recordSkill(p, skill, ok, firstTry))}
+          onChispaTap={() => bump('chispaTaps')}
+          onBreath={() => bump('breaths')}
         />
       )}
 
-      {/* ===== CANDADO ANTI-ADICCIÓN: el campamento descansa ===== */}
+      {/* Candado anti-adicción: el campamento descansa */}
       {resting && (
         <div className="fixed inset-0 z-30 flex items-center justify-center p-4 bg-sky-50/50 backdrop-blur-md">
           <div className="cozy-panel max-w-md w-full p-6 flex flex-col items-center gap-4 text-center animate-fadeIn">
@@ -328,43 +380,60 @@ export const GameApp: FunctionalComponent = () => {
             </div>
             <div className="grid grid-cols-2 gap-2 w-full">
               <GlassButton size="lg" onClick={() => setBreath(15)}><Wind className="w-5 h-5" /> Respirar</GlassButton>
-              <GlassButton size="lg" onClick={() => setPassport(true)}><QrCode className="w-5 h-5" /> Pasaporte</GlassButton>
+              <GlassButton size="lg" onClick={() => setLogros(true)}><Trophy className="w-5 h-5" /> Logros</GlassButton>
             </div>
             <GlassButton variant="ghost" onClick={() => setPhase('profile')}>Otro jugador</GlassButton>
           </div>
         </div>
       )}
 
-      {/* ===== INGRESO ===== */}
+      {/* Ingreso */}
       {phase === 'profile' && store && (
         <ProfileScreen
           profiles={store.profiles}
           onSelect={(id) => {
-            commit({ ...store, activeId: id, profiles: store.profiles.map((p) => (p.id === id ? normalizeProfile(p) : p)) });
+            setStore({ ...store, activeId: id, profiles: store.profiles.map((p) => (p.id === id ? normalizeProfile(p) : p)) });
             setPhase('checkin');
           }}
           onCreate={(name, avatar) => {
             const p = createProfile(name, avatar);
-            commit({ ...store, activeId: p.id, profiles: [...store.profiles, p] });
+            setStore({ ...store, activeId: p.id, profiles: [...store.profiles, p] });
             setPhase('checkin');
           }}
         />
       )}
       {phase === 'checkin' && student && <CheckInModal name={student.name} onPick={pickMood} />}
 
-      {student && <PassportModal isOpen={passport} onClose={() => setPassport(false)} student={student} />}
+      {student && <AchievementsModal isOpen={logros} onClose={() => setLogros(false)} student={student} />}
       <BreathingModal
         isOpen={breath !== null}
         durationSeconds={breath ?? 10}
         onClose={() => {
           setBreath(null);
-          updateStudent((p) => ({ ...p, talentScores: { ...p.talentScores, emergencyCalm: clamp100(p.talentScores.emergencyCalm + 2) } }));
+          bump('breaths');
         }}
       />
-
-      {view === 'teacher' && (
-        <TeacherView currentStudent={student} onBackToGame={() => setView('student')} onResetSuns={() => updateStudent((p) => ({ ...p, currentSunEnergy: MAX_SUNS }))} />
-      )}
     </div>
   );
+};
+
+/** Si algo falla, el niño ve a Chispa y un botón para seguir (no una pantalla en blanco). */
+export const GameApp: FunctionalComponent = () => {
+  const [error, reset] = useErrorBoundary((e) => console.error('Error en Sendero:', e));
+  const [key, setKey] = useState(0);
+  if (error) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center p-4 bg-sky-100">
+        <div className="cozy-panel max-w-md w-full p-6 flex flex-col items-center gap-3 text-center">
+          <SquirrelArt mood="thinking" size={90} />
+          <span className="cozy-ribbon">¡Ups! Algo se trabó</span>
+          <GlassButton size="xl" variant="primary" onClick={() => { reset(); setKey((k) => k + 1); }}>
+            <RotateCcw className="w-5 h-5" /> Reintentar
+          </GlassButton>
+          <p className="text-[11px] font-mono text-slate-400 break-all">{String((error as Error)?.message ?? error)}</p>
+        </div>
+      </div>
+    );
+  }
+  return <Game key={key} />;
 };

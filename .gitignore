@@ -13,3 +13,6 @@ Thumbs.db
 
 # Documento interno de especificación (no publicar)
 tarea.md
+
+# Generado por scripts/voice/collect.mjs
+scripts/voice/phrases.json

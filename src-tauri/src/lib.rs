@@ -1,7 +1,6 @@
 //! Motor nativo offline de Sendero.
 //! Rust se encarga de lo que el navegador no puede garantizar: escribir en disco
-//! de forma segura (cortes de luz en albergues) y exportar el pasaporte a un archivo
-//! que se puede llevar en USB. El render 3D vive en el WebView (WebGL).
+//! de forma segura (cortes de luz en albergues). El render 3D vive en el WebView (WebGL).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -43,26 +42,6 @@ fn load_offline_progress(app: AppHandle) -> Result<Option<serde_json::Value>, St
     Ok(serde_json::from_str(&raw).ok())
 }
 
-/// Escribe el código firmado del pasaporte en Documentos para copiarlo a USB o imprimirlo.
-#[tauri::command]
-fn export_signed_passport(app: AppHandle, student_name: String, code: String) -> Result<String, String> {
-    let dir = app
-        .path()
-        .document_dir()
-        .or_else(|_| app.path().app_data_dir())
-        .map_err(|e| e.to_string())?;
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let safe: String = student_name
-        .chars()
-        .filter(|c| c.is_alphanumeric())
-        .take(30)
-        .collect();
-    let name = if safe.is_empty() { "explorador".to_string() } else { safe };
-    let path = dir.join(format!("pasaporte_{name}.txt"));
-    write_atomic(&path, &code)?;
-    Ok(path.display().to_string())
-}
-
 /// Confirma que el almacenamiento nativo funciona sin red y devuelve dónde se guarda.
 #[tauri::command]
 fn check_offline_status(app: AppHandle) -> Result<String, String> {
@@ -75,7 +54,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             save_offline_progress,
             load_offline_progress,
-            export_signed_passport,
             check_offline_status
         ])
         .run(tauri::generate_context!())

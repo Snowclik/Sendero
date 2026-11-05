@@ -77,7 +77,8 @@ export class IsoWorld {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera: THREE.OrthographicCamera;
-  private clock = new THREE.Clock();
+  private timer = new THREE.Timer();
+  private walked = 0; // bloques caminados desde la última lectura
   private raf = 0;
   private cb: WorldCallbacks;
 
@@ -757,8 +758,9 @@ export class IsoWorld {
   // ==========================================================================
   private loop = () => {
     this.raf = requestAnimationFrame(this.loop);
-    const dt = Math.min(this.clock.getDelta(), 0.05);
-    const t = this.clock.elapsedTime;
+    this.timer.update();
+    const dt = Math.min(this.timer.getDelta(), 0.1); // hasta 10 FPS sin cámara lenta (equipos de gama baja)
+    const t = this.timer.getElapsed();
     this.updatePlayer(dt);
     this.updateSquirrel(dt, t);
     this.updateCamera(dt);
@@ -811,8 +813,11 @@ export class IsoWorld {
       const dx = (mx / len) * step;
       const dz = (mz / len) * step;
       const r = 0.28;
+      const bx = this.pos.x;
+      const bz = this.pos.z;
       if (this.walkable(Math.floor(this.pos.x + dx + Math.sign(dx) * r), Math.floor(this.pos.z))) this.pos.x += dx;
       if (this.walkable(Math.floor(this.pos.x), Math.floor(this.pos.z + dz + Math.sign(dz) * r))) this.pos.z += dz;
+      this.walked += Math.hypot(this.pos.x - bx, this.pos.z - bz);
       const targetRot = Math.atan2(mx, mz);
       let diff = targetRot - this.player.rotation.y;
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
@@ -968,10 +973,17 @@ export class IsoWorld {
     this.gardenCover.visible = done('mision-4-bosque');
   }
 
-  /** Misión 1: filtros encendidos -> el tanque sube (marca ámbar = 24 L). */
-  setFilters(n: number, perUnit: number) {
+  /** Misión 1: filtros encendidos -> el tanque sube (marca ámbar = la meta de litros). */
+  setFilters(n: number, perUnit: number, target = 24) {
     this.filters.forEach((f, i) => (f.material as THREE.MeshLambertMaterial).color.setHex(i < n ? C.sky : C.slate));
-    this.tankTarget = Math.min((n * perUnit) / 24, 1.3) * 0.8; // 0.8 = altura de la marca de 24 L
+    this.tankTarget = Math.min((n * perUnit) / target, 1.3) * 0.8; // 0.8 = altura de la marca
+  }
+
+  /** Metros caminados desde la última llamada (1 bloque = 3 m). */
+  takeWalkedMeters() {
+    const m = this.walked * 3;
+    this.walked = 0;
+    return m;
   }
 
   /** Misión 1: suma de válvulas en el manómetro. Verde = exacto. */
