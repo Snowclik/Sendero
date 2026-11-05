@@ -1,7 +1,7 @@
 import type { FunctionalComponent } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useEffect, useErrorBoundary, useRef, useState } from 'preact/hooks';
-import { Award, Check, Lock, MousePointerClick, RotateCcw, Shirt, Sun, Tent, Trophy, Volume2, WifiOff, Wind } from 'lucide-preact';
+import { Award, Check, Lock, MousePointerClick, RotateCcw, Shirt, Sparkles, Sun, Tent, Trophy, Volume2, WifiOff, Wind } from 'lucide-preact';
 import { IsoWorld, type StationState } from '../game/IsoWorld';
 import { MissionPanel, STATION_ICONS, type MissionResult } from './MissionPanel';
 import { AchievementsModal } from './AchievementsModal';
@@ -10,13 +10,14 @@ import { MainMenu, type MenuItem } from './MainMenu';
 import { BreathingModal } from './ui/BreathingModal';
 import { GlassButton } from './ui/GlassButton';
 import { SquirrelArt } from './ui/Art';
-import { AVATARS, ProfileScreen } from './Onboarding';
+import { AVATARS, ProfileScreen, StoryScreen } from './Onboarding';
 import { MISSIONS, isUnlocked, missionById, nextMission, type Mission, type MissionId, type SkillId } from '../data/missionsData';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { LINES } from '../data/lines';
 import { fill, speechParts, type Params } from '../game/problems';
+import { isReto, planReto, playerLevel, tierOf } from '../game/brain';
 import {
-  MAX_SUNS, createProfile, isTauriEnvironment, loadStore, normalizeProfile, recordSkill, saveStore,
+  MAX_SUNS, SUN_LIMIT_ON, createProfile, isTauriEnvironment, loadStore, normalizeProfile, recordSkill, saveStore,
   type SaveStore, type StudentProfile,
 } from '../services/storageService';
 import { onListen, playClickSound, playSuccessSound, say, sayText, sayTpl, stopSpeaking } from '../services/soundService';
@@ -41,6 +42,7 @@ const Game: FunctionalComponent = () => {
 
   const [store, setStore] = useState<SaveStore | null>(null);
   const [phase, setPhase] = useState<Phase>('menu');
+  const [story, setStory] = useState(false); // historia de inicio: sin miedo, yo sé qué hacer
   const [afterProfile, setAfterProfile] = useState<Phase>('play'); // a dónde ir después de elegir jugador
   const [near, setNear] = useState<MissionId | null>(null);
   const [mission, setMission] = useState<Mission | null>(null);
@@ -52,7 +54,7 @@ const Game: FunctionalComponent = () => {
   const [webglError, setWebglError] = useState(false);
 
   const student = store?.profiles.find((p) => p.id === store.activeId) ?? null;
-  const suns = student?.currentSunEnergy ?? MAX_SUNS;
+  const suns = SUN_LIMIT_ON ? student?.currentSunEnergy ?? MAX_SUNS : MAX_SUNS;
   const calm = reducedMotion();
   const objective = student ? nextMission(student.completedMissions) : null;
   const resting = phase === 'play' && !mission && suns === 0;
@@ -111,7 +113,7 @@ const Game: FunctionalComponent = () => {
   const inputOn = phase === 'play' && !mission && !logros && breath === null && !resting;
   useEffect(() => worldRef.current?.setInputEnabled(inputOn), [inputOn]);
   useEffect(() => worldRef.current?.setCalm(calm), [calm]);
-  useEffect(() => worldRef.current?.focusStation(mission?.id ?? null), [mission]);
+  useEffect(() => worldRef.current?.focusStation(mission && !isReto(mission) ? mission.id : null), [mission]);
   useEffect(() => {
     if (!sqLine) return;
     const t = setTimeout(() => setSqLine(null), 5000);
@@ -168,6 +170,12 @@ const Game: FunctionalComponent = () => {
     setMission(missionById(id)!);
   };
   interactRef.current = tryStart;
+  const startReto = () => {
+    if (!student || !inputOn) return;
+    playClickSound();
+    setMission(planReto(student).mission);
+  };
+  const canReto = !!student && student.completedMissions.length > 0;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -188,16 +196,18 @@ const Game: FunctionalComponent = () => {
   // --- Resultado de nivel ------------------------------------------------
   const completeMission = (r: MissionResult): string[] => {
     if (!student || !mission) return [];
-    const replay = student.completedMissions.includes(mission.id);
+    const reto = isReto(mission);
+    const replay = !reto && student.completedMissions.includes(mission.id);
     const next: StudentProfile = {
       ...student,
-      completedMissions: replay ? student.completedMissions : [...student.completedMissions, mission.id],
-      currentSunEnergy: Math.max(0, student.currentSunEnergy - 1),
+      completedMissions: replay || reto ? student.completedMissions : [...student.completedMissions, mission.id],
+      currentSunEnergy: SUN_LIMIT_ON ? Math.max(0, student.currentSunEnergy - 1) : MAX_SUNS,
       duoModeCompleted: student.duoModeCompleted || r.duo,
       resilienceEarned: student.resilienceEarned || r.mistakes > 0,
       stats: {
         ...student.stats,
         replays: student.stats.replays + (replay ? 1 : 0),
+        retos: student.stats.retos + (reto ? 1 : 0),
         missionsNoHint: student.stats.missionsNoHint + (r.hints === 0 ? 1 : 0),
         missionsPerfect: student.stats.missionsPerfect + (r.mistakes === 0 ? 1 : 0),
       },
@@ -224,6 +234,7 @@ const Game: FunctionalComponent = () => {
   };
   const menuItems: MenuItem[] = [
     { id: 'jugar', label: '¡A jugar!', action: () => go('play') },
+    { id: 'historia', label: 'La historia', action: () => { stopSpeaking(); setStory(true); } },
     { id: 'vestuario', label: 'Vestuario', action: () => go('wardrobe') },
     { id: 'logros', label: 'Mis logros', action: () => (student ? setLogros(true) : go('play')) },
     { id: 'jugador', label: student ? 'Cambiar jugador' : 'Elegir jugador', action: () => { setAfterProfile('menu'); setPhase('profile'); } },
@@ -281,11 +292,24 @@ const Game: FunctionalComponent = () => {
             </span>
           </button>
 
-          <div className="pointer-events-auto flex items-center gap-1 px-3 py-2 rounded-2xl bg-[#fffaf0] border-[3px] border-white shadow-[0_5px_0_rgba(146,112,52,.22)]" aria-label={`Energía solar: ${suns} de 3`} title="Energía solar del campamento">
-            {Array.from({ length: MAX_SUNS }).map((_, i) => (
-              <Sun key={i} className={`w-8 h-8 ${i < suns ? 'text-amber-500 fill-amber-300' : 'text-[#e6d3ab]'}`} />
-            ))}
-          </div>
+          {SUN_LIMIT_ON ? (
+            <div className="pointer-events-auto flex items-center gap-1 px-3 py-2 rounded-2xl bg-[#fffaf0] border-[3px] border-white shadow-[0_5px_0_rgba(146,112,52,.22)]" aria-label={`Energía solar: ${suns} de 3`} title="Energía solar del campamento">
+              {Array.from({ length: MAX_SUNS }).map((_, i) => (
+                <Sun key={i} className={`w-8 h-8 ${i < suns ? 'text-amber-500 fill-amber-300' : 'text-[#e6d3ab]'}`} />
+              ))}
+            </div>
+          ) : (() => {
+            const { level, progress } = playerLevel(student);
+            return (
+              <div className="pointer-events-auto flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-2xl bg-[#fffaf0] border-[3px] border-white shadow-[0_5px_0_rgba(146,112,52,.22)]" aria-label={`Nivel ${level}`} title="Tu nivel crece con cada acierto">
+                <span className="w-10 h-10 rounded-xl bg-violet-500 text-white flex items-center justify-center font-black text-lg shadow-[0_3px_0_#6d28d9]">{level}</span>
+                <span className="flex flex-col gap-1">
+                  <span className="text-xs font-black text-slate-600 leading-none">Nivel</span>
+                  <span className="w-24 h-2.5 rounded-full bg-[#eadcbc] overflow-hidden"><span className="block h-full bg-violet-400 rounded-full transition-all" style={{ width: `${Math.round(progress * 100)}%` }} /></span>
+                </span>
+              </div>
+            );
+          })()}
 
           <div className="pointer-events-auto flex items-center gap-2">
             <button onClick={() => { setMission(null); setPhase('wardrobe'); }} className={roundBtn} title="Vestuario" aria-label="Vestuario">
@@ -322,6 +346,12 @@ const Game: FunctionalComponent = () => {
                 </div>
               );
             })}
+            {canReto && (
+              <button onClick={startReto} className="ml-1.5 flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-2xl bg-violet-500 text-white font-black shadow-[0_4px_0_#6d28d9] active:translate-y-[3px] active:shadow-none anim-bob" aria-label="Reto de Chispa: un reto nuevo hecho para ti">
+                <span className="w-9 h-9 rounded-xl bg-white/25 flex items-center justify-center"><Sparkles className="w-5 h-5" /></span>
+                Reto
+              </button>
+            )}
           </div>
 
           {!nearMission && (
@@ -365,11 +395,11 @@ const Game: FunctionalComponent = () => {
           mission={mission}
           world={worldRef.current}
           calm={calm}
-          sunsLeftAfter={Math.max(0, suns - 1)}
+          tierOf={(s) => tierOf(student, s)}
           onExit={exitMission}
           onComplete={completeMission}
           onHintUsed={() => updateStudent((p) => ({ ...p, hintsUsed: p.hintsUsed + 1 }))}
-          onSkill={(skills: SkillId[], ok, firstTry) => updateStudent((p) => recordSkill(p, skills, ok, firstTry))}
+          onSkill={(skills: SkillId[], ok, firstTry, guess) => updateStudent((p) => recordSkill(p, skills, ok, firstTry, guess))}
           onChispaTap={() => bump('chispaTaps')}
           onBreath={() => bump('breaths')}
         />
@@ -414,6 +444,7 @@ const Game: FunctionalComponent = () => {
             const p = createProfile(name, avatar);
             setStore({ ...store, activeId: p.id, profiles: [...store.profiles, p] });
             setPhase(afterProfile);
+            setStory(true); // un jugador nuevo ve primero de qué trata
           }}
         />
       )}
@@ -426,6 +457,7 @@ const Game: FunctionalComponent = () => {
         />
       )}
 
+      {story && <StoryScreen onDone={() => setStory(false)} />}
       {student && <AchievementsModal isOpen={logros} onClose={() => setLogros(false)} student={student} />}
       <BreathingModal
         isOpen={breath !== null}

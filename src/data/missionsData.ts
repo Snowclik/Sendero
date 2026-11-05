@@ -109,8 +109,8 @@ export const MISSIONS: Mission[] = [
     stationName: 'Escuela',
     title: '¡Tiembla la tierra!',
     disaster: 'Sismo',
-    shortStory: ['Hubo un sismo fuerte en Panamá.', 'Aprendamos qué hacer si vuelve a temblar.'],
-    squirrelCall: '¡Tembló la tierra! Vamos a la escuela.',
+    shortStory: ['Si tiembla, no corras: tú sabes qué hacer.', 'Vamos a practicarlo con calma.'],
+    squirrelCall: 'Vamos a practicar qué hacer si tiembla. ¡A la escuela!',
     steps: [
       {
         type: 'read',
@@ -211,8 +211,8 @@ export const MISSIONS: Mission[] = [
     stationName: 'Orilla del Río',
     title: '¡Sube el río!',
     disaster: 'Inundación',
-    shortStory: ['Llovió mucho y el río está creciendo.', 'Aprendamos a estar a salvo del agua.'],
-    squirrelCall: '¡El río está creciendo! Vamos a la orilla.',
+    shortStory: ['Si llueve mucho, el río crece.', 'Si sabes cuándo subir, estás a salvo.'],
+    squirrelCall: 'Ahora, qué hacer si el río crece. ¡A la orilla!',
     duoRoles: { A: 'Explorador A · Lee', B: 'Explorador B · Calcula' },
     steps: [
       {
@@ -326,8 +326,8 @@ export const MISSIONS: Mission[] = [
     stationName: 'Campo Abierto',
     title: '¡Rayos y truenos!',
     disaster: 'Tormenta eléctrica',
-    shortStory: ['Viene una tormenta con rayos.', 'Aprendamos dónde protegernos.'],
-    squirrelCall: '¡Se oyen truenos! Vamos al campo.',
+    shortStory: ['Los truenos suenan fuerte, pero no te asustes.', 'Contando segundos, sabrás qué tan lejos están.'],
+    squirrelCall: 'Ahora, qué hacer si hay rayos. ¡Al campo!',
     steps: [
       {
         type: 'number',
@@ -428,8 +428,8 @@ export const MISSIONS: Mission[] = [
     stationName: 'Cabaña del Bosque',
     title: '¡Hay humo!',
     disaster: 'Incendio',
-    shortStory: ['Después del sismo, hay riesgo de incendios.', 'Aprendamos a salir a salvo.'],
-    squirrelCall: 'Huele a humo en la cabaña. ¡Vamos!',
+    shortStory: ['Si hay humo, sal con calma y agachado.', 'Vamos a ensayar la salida.'],
+    squirrelCall: 'Último: qué hacer si hay humo. ¡A la cabaña!',
     steps: [
       {
         type: 'read',

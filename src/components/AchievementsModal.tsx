@@ -2,12 +2,13 @@ import type { FunctionalComponent } from 'preact';
 import { useState } from 'preact/hooks';
 import {
   Activity, Award, BookOpen, Brain, Calculator, CloudLightning, Ear, Flame, Footprints, HeartHandshake, LifeBuoy, Lock, Repeat, Shirt, Squirrel,
-  Star, Target, Trophy, Users, Waves, Wind, X, Zap,
+  Sparkles, Star, Target, Trophy, Users, Waves, Wind, X, Zap,
 } from 'lucide-preact';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { SKILLS, type Subject } from '../data/missionsData';
 import type { StudentProfile } from '../services/storageService';
 import { playClickSound } from '../services/soundService';
+import { TIER_NAME, knowOf, tierFromKnow, weakest } from '../game/brain';
 
 const ICONS = { Activity, Waves, CloudLightning, Flame, Shirt, Users, HeartHandshake, Zap, Target, Squirrel, Wind, Footprints, Repeat, Brain, Ear };
 const LEVEL = ['Nuevo', 'Aprendiendo', 'Casi', '¡Lo domino!'];
@@ -30,8 +31,8 @@ export const AchievementsModal: FunctionalComponent<{ isOpen: boolean; onClose: 
   const earned = ACHIEVEMENTS.filter((a) => a.earned(student)).length;
   const subject = (s: Subject) => {
     const list = SKILLS.filter((k) => k.subject === s);
-    const stars = list.reduce((a, k) => a + (student.skills[k.id]?.mastery ?? 0), 0);
-    return { list, pct: Math.round((stars / (list.length * 3)) * 100) };
+    // Porcentaje = dominio estimado por la IA local (no clics ni tiempo jugado)
+    return { list, pct: Math.round((list.reduce((a, k) => a + knowOf(student, k.id), 0) / list.length) * 100) };
   };
   const Tab = ({ id, label, Icon }: { id: typeof tab; label: string; Icon: any }) => (
     <button
@@ -73,8 +74,19 @@ export const AchievementsModal: FunctionalComponent<{ isOpen: boolean; onClose: 
           </div>
         )}
 
-        {tab === 'aprendo' && (
+        {tab === 'aprendo' && (() => {
+          const order = weakest(student).filter((k) => student.skills[k.id]);
+          return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-3 cozy-tile p-3 flex items-center gap-3">
+              <span className="w-12 h-12 shrink-0 rounded-2xl bg-violet-500 text-white flex items-center justify-center shadow-[0_4px_0_#6d28d9]"><Sparkles className="w-7 h-7" /></span>
+              <div className="flex-1 min-w-0">
+                <p className="font-black text-slate-800">Chispa aprende de ti</p>
+                <p className="text-sm font-bold text-slate-600">
+                  {order.length ? <>Tus retos traen más <b className="text-violet-700">{order[0].name}</b>{order.length > 1 && <> · Lo que mejor haces: <b className="text-emerald-700">{order[order.length - 1].name}</b></>}</> : 'Juega una estación y Chispa empezará a conocerte.'}
+                </p>
+              </div>
+            </div>
             {(['prevencion', 'matematica', 'espanol'] as const).map((s) => {
               const { list, pct } = subject(s);
               const look = SUBJECT_LOOK[s];
@@ -101,6 +113,7 @@ export const AchievementsModal: FunctionalComponent<{ isOpen: boolean; onClose: 
                           <span className="font-black text-slate-700 text-sm leading-tight">{k.name}</span>
                           <span className={`text-[11px] font-black ${m >= 3 ? 'text-emerald-600' : 'text-slate-400'}`}>{p ? LEVEL[m] : 'Por descubrir'}</span>
                         </span>
+                        {p && <span className="px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[11px] font-black">{TIER_NAME[tierFromKnow(knowOf(student, k.id))]}</span>}
                         <Stars n={m} />
                       </div>
                     );
@@ -108,9 +121,10 @@ export const AchievementsModal: FunctionalComponent<{ isOpen: boolean; onClose: 
                 </div>
               );
             })}
-            <p className="md:col-span-3 text-xs text-slate-500 text-center">Las estrellas suben cuando aciertas a la primera, con números nuevos cada vez.</p>
+            <p className="md:col-span-3 text-xs text-slate-500 text-center">La IA de Chispa vive en tu equipo, sin internet: estima cuánto dominas cada cosa y ajusta los retos.</p>
           </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

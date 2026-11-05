@@ -1,6 +1,6 @@
 import type { FunctionalComponent } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { ArrowLeft, BookOpen, Compass, Heart, Lock, Plus, Shield, Sun, TreePine } from 'lucide-preact';
+import { ArrowLeft, BookOpen, Calculator, Compass, Heart, Lock, Mountain, Plus, Shield, ShieldCheck, Sun, TreePine, Volume2, Wind } from 'lucide-preact';
 import { GlassButton } from './ui/GlassButton';
 import { SquirrelArt } from './ui/Art';
 import { playClickSound, sayText } from '../services/soundService';
@@ -107,5 +107,42 @@ export const ProfileScreen: FunctionalComponent<{
         </form>
       )}
     </Stage>
+  );
+};
+
+/** Historia de inicio: 4 tarjetas, una idea cada una. El mensaje: con saber qué hacer, el miedo baja. */
+const STORY_ICONS = [Mountain, Wind, ShieldCheck, Calculator];
+const STORY_TONE = ['bg-amber-400 shadow-[0_6px_0_#b45309]', 'bg-sky-400 shadow-[0_6px_0_#0369a1]', 'bg-emerald-500 shadow-[0_6px_0_#047857]', 'bg-violet-500 shadow-[0_6px_0_#6d28d9]'];
+
+export const StoryScreen: FunctionalComponent<{ onDone: () => void }> = ({ onDone }) => {
+  const [i, setI] = useState(0);
+  const text = LINES.story[i];
+  const Icon = STORY_ICONS[i];
+  const last = i === LINES.story.length - 1;
+  return (
+    <div className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-sky-100/60 backdrop-blur-sm">
+      <div key={i} className="cozy-panel w-full max-w-md p-6 flex flex-col items-center gap-5 text-center animate-fadeIn">
+        <div className="relative">
+          <span className={`w-28 h-28 rounded-[32px] text-white flex items-center justify-center ${STORY_TONE[i]} ${i === 1 ? 'anim-bob' : ''}`}>
+            <Icon className="w-16 h-16" />
+          </span>
+          <span className="absolute -right-8 -bottom-3"><SquirrelArt mood={i === 1 ? 'idle' : 'happy'} size={72} /></span>
+        </div>
+        <p className="text-2xl font-black text-slate-800 leading-snug">{text}</p>
+        <button
+          onClick={() => sayText(text, { user: true })}
+          className="w-12 h-12 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center"
+          aria-label={`Escuchar: ${text}`}
+        >
+          <Volume2 className="w-6 h-6" />
+        </button>
+        <div className="flex gap-2" aria-hidden="true">
+          {LINES.story.map((_, k) => <span key={k} className={`h-2.5 rounded-full transition-all ${k === i ? 'w-8 bg-teal-500' : 'w-2.5 bg-[#e6d3ab]'}`} />)}
+        </div>
+        <GlassButton variant="primary" size="lg" onClick={() => { playClickSound(); last ? onDone() : setI(i + 1); }}>
+          {last ? '¡Vamos!' : 'Siguiente'}
+        </GlassButton>
+      </div>
+    </div>
   );
 };

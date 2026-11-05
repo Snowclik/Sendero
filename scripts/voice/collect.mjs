@@ -1,7 +1,7 @@
 // Junta todas las frases que el juego puede decir en voz alta -> scripts/voice/phrases.json
 // Uso: node --experimental-strip-types scripts/voice/collect.mjs
 import { writeFileSync } from 'node:fs';
-import { MISSIONS } from '../../src/data/missionsData.ts';
+import { MISSIONS, SKILLS } from '../../src/data/missionsData.ts';
 import { LINES } from '../../src/data/lines.ts';
 import { ACHIEVEMENTS } from '../../src/data/achievements.ts';
 import { templateFragments } from '../../src/game/problems.ts';
@@ -27,6 +27,9 @@ for (const m of MISSIONS) {
 }
 for (const v of Object.values(LINES)) (Array.isArray(v) ? v : [v]).forEach(add);
 ACHIEVEMENTS.forEach((a) => add(a.name));
+// Retos de Chispa (brain.ts)
+add('¡Reto nuevo! Lo armé pensando en ti.');
+SKILLS.forEach((s) => add(`Hoy practicamos: ${s.name}.`));
 for (let n = 0; n <= 200; n++) set.add(String(n));
 
 const phrases = [...set].sort();

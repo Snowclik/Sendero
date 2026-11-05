@@ -5,6 +5,7 @@
  * - En navegador: localStorage (siempre se escribe también como respaldo).
  */
 import type { SkillId } from '../data/missionsData';
+import { bkt } from '../game/brain';
 import { CATEGORIES, DEFAULT_OUTFIT, WARDROBE, type Outfit } from '../data/wardrobe';
 
 export type Mood = 'tranquilo' | 'inquieto' | 'ayuda';
@@ -27,6 +28,7 @@ export interface Stats {
   missionsNoHint: number;
   missionsPerfect: number;
   outfits: number; // veces que guardó ropa nueva
+  retos: number; // retos de Chispa superados
 }
 
 export interface StudentProfile {
@@ -42,6 +44,7 @@ export interface StudentProfile {
   resilienceEarned: boolean;
   hintsUsed: number;
   skills: Partial<Record<SkillId, SkillProgress>>;
+  know: Partial<Record<SkillId, number>>; // IA local: probabilidad de dominar cada habilidad (0-1)
   stats: Stats;
   achievementsSeen: string[]; // para anunciar solo los nuevos
   outfit: Outfit;
@@ -56,13 +59,15 @@ export interface SaveStore {
 // Clave con el nombre viejo a propósito: renombrarla borraría partidas guardadas.
 const STORAGE_KEY = 'valle_resiliente_store_v2';
 export const MAX_SUNS = 3;
+// ponytail: límite diario apagado para probar todo. Para la entrega con niños, volver a true.
+export const SUN_LIMIT_ON = false;
 
 export const todayKey = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-const EMPTY_STATS: Stats = { chispaTaps: 0, breaths: 0, meters: 0, replays: 0, listens: 0, missionsNoHint: 0, missionsPerfect: 0, outfits: 0 };
+const EMPTY_STATS: Stats = { chispaTaps: 0, breaths: 0, meters: 0, replays: 0, listens: 0, missionsNoHint: 0, missionsPerfect: 0, outfits: 0, retos: 0 };
 
 export function createProfile(name: string, avatarIcon: AvatarIcon): StudentProfile {
   return {
@@ -78,6 +83,7 @@ export function createProfile(name: string, avatarIcon: AvatarIcon): StudentProf
     resilienceEarned: false,
     hintsUsed: 0,
     skills: {},
+    know: {},
     stats: { ...EMPTY_STATS },
     achievementsSeen: [],
     outfit: { ...DEFAULT_OUTFIT },
@@ -106,6 +112,7 @@ export function normalizeProfile(raw: any): StudentProfile {
     resilienceEarned: !!raw?.resilienceEarned,
     hintsUsed: Number(raw?.hintsUsed) || 0,
     skills: raw?.skills && typeof raw.skills === 'object' ? raw.skills : {},
+    know: raw?.know && typeof raw.know === 'object' ? Object.fromEntries(Object.entries(raw.know).filter(([, v]) => Number.isFinite(v))) as StudentProfile['know'] : {},
     stats: { ...EMPTY_STATS, ...(raw?.stats || {}) },
     achievementsSeen: Array.isArray(raw?.achievementsSeen) ? raw.achievementsSeen : [],
     outfit: validOutfit(raw?.outfit),
@@ -161,8 +168,10 @@ export async function saveStore(store: SaveStore): Promise<void> {
 }
 
 /** Registra el resultado de un problema en sus habilidades. */
-export function recordSkill(p: StudentProfile, skills: SkillId[], ok: boolean, firstTry: boolean): StudentProfile {
+export function recordSkill(p: StudentProfile, skills: SkillId[], ok: boolean, firstTry: boolean, guess = 0.2): StudentProfile {
   const all = { ...p.skills };
+  const know = { ...p.know };
+  for (const skill of skills) know[skill] = bkt(know[skill] ?? 0.15, ok, guess);
   for (const skill of skills) {
     const s = all[skill] ?? { attempts: 0, correct: 0, firstTry: 0, mastery: 0 };
     all[skill] = {
@@ -172,5 +181,5 @@ export function recordSkill(p: StudentProfile, skills: SkillId[], ok: boolean, f
       mastery: Math.min(3, s.mastery + (ok && firstTry ? 1 : 0)),
     };
   }
-  return { ...p, skills: all };
+  return { ...p, skills: all, know };
 }

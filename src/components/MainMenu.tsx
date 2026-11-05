@@ -40,7 +40,7 @@ export const MainMenu: FunctionalComponent<{ items: MenuItem[]; player?: string 
             Sendero
           </h1>
           <p className="mt-2 ml-2 text-lg font-black text-white" style={{ textShadow: '0 2px 6px rgba(0,0,0,.45)' }}>
-            Aprende qué hacer en cada emergencia
+            Si pasa algo, yo sé qué hacer
           </p>
         </div>
 

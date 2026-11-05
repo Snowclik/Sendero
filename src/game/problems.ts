@@ -32,34 +32,40 @@ const otherIndex = (len: number, prev?: number) => {
 };
 
 /** Crea un problema distinto al anterior (si lo hay). */
-export function makeProblem(step: MicroStep, prev?: Problem): Problem {
+export function makeProblem(step: MicroStep, prev?: Problem, tier = 1): Problem {
   for (let tries = 0; tries < 20; tries++) {
-    const p = generate(step, prev);
+    const p = generate(step, prev, tier);
     if (!prev || JSON.stringify(p.params) !== JSON.stringify(prev.params) || p.variant !== prev.variant) return p;
   }
-  return generate(step, prev);
+  return generate(step, prev, tier);
 }
 
-function generate(step: MicroStep, prev?: Problem): Problem {
+/** Elige según el nivel (1-4) que la IA local calculó para esa habilidad. */
+const byTier = <T>(tier: number, xs: T[]) => xs[Math.max(0, Math.min(xs.length, tier) - 1)];
+
+function generate(step: MicroStep, prev: Problem | undefined, tier: number): Problem {
   switch (step.type) {
     case 'counter': {
       // Mochila: botellas de {per} litros hasta {target} litros
-      const per = pick([1, 2, 3]);
-      const n = int(2, 5);
+      const per = pick(byTier(tier, [[1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9]]));
+      const n = tier === 1 ? int(2, 5) : int(3, 6);
       return { params: { per, target: per * n }, answer: n, max: 6 };
     }
     case 'share': {
-      const each = int(3, 8);
+      const [a, b] = byTier(tier, [[3, 8], [6, 12], [10, 20], [15, 33]]);
+      const each = int(a, b);
       return { params: { total: each * 3 }, answer: each };
     }
     case 'number': {
       if (step.data.gen === 'rising') {
-        const per = pick([5, 10]);
-        const n = int(2, 6);
+        const per = pick(byTier(tier, [[5, 10], [2, 3, 4, 6], [6, 7, 8, 9], [12, 15, 25]]));
+        const [a, b] = byTier(tier, [[2, 6], [3, 7], [4, 9], [5, 9]]);
+        const n = int(a, b);
         return { params: { per, target: per * n }, answer: n };
       }
       // Tormenta: cada 3 segundos entre rayo y trueno = 1 km
-      const km = int(1, 5);
+      const [a, b] = byTier(tier, [[1, 5], [2, 7], [4, 9], [6, 10]]);
+      const km = int(a, b);
       return { params: { s: km * 3 }, answer: km };
     }
     case 'read': {

@@ -4,8 +4,8 @@
  */
 export const LINES = {
   // Menú y mapa
-  menuHello: '¡Hola! Soy Chispa. ¿Listos para aprender a estar a salvo?',
-  allDone: '¡Ya sabes qué hacer en cada emergencia!',
+  menuHello: '¡Hola! Soy Chispa. Si sabes qué hacer, no hay que tener miedo.',
+  allDone: '¡Toca Reto! Cada reto es nuevo y hecho para ti.',
   locked: '¡Aún no! Primero: {station}.',
   achievement: '¡Logro nuevo! {name}.',
   wardrobe: '¡Elige tu ropa!',
@@ -36,6 +36,14 @@ export const LINES = {
   siftWrong: 'Ese mensaje no tiene autor ni fecha.',
   siftRight: '¡Tiene autor y fecha! Es confiable.',
   orderWrong: '¿Qué va primero?',
+  // Historia de inicio (una idea por tarjeta)
+  story: [
+    'A veces la naturaleza se mueve: tiembla, llueve fuerte o caen rayos.',
+    'Sentir miedo es normal. Primero, respira conmigo.',
+    'Si sabes qué hacer, estás a salvo.',
+    'Contando y leyendo, vamos a practicar. ¡Tú puedes!',
+  ],
+  retoNext: '¡Muy bien! Tu próximo reto será distinto.',
   // Fin
   rest: '¡A descansar! Mañana hay más soles.',
 } as const;

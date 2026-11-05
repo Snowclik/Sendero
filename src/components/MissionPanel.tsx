@@ -3,12 +3,13 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import {
   Activity, ArrowDownToLine, ArrowRight, Award, Backpack, BedDouble, BookOpen, CalendarDays, CalendarX, Check, Clock, CloudLightning, CloudRain,
   Delete, DoorClosed, DoorOpen, Droplet, Ear, Flame, Footprints, Hand, Home, ListOrdered, Megaphone, MessageCircle, Mountain, Phone,
-  RotateCcw, School, Search, Shield, ShieldCheck, Shirt, Sun, TreePine, Unplug, User, UserCheck, Users, UserX, Volume2, Waves, Wind, X, Zap,
+  RotateCcw, School, Search, Shield, ShieldCheck, Shirt, Sparkles, Sun, TreePine, Unplug, User, UserCheck, Users, UserX, Volume2, Waves, Wind, X, Zap,
 } from 'lucide-preact';
 import type { IconKey, MicroStep, Mission, SkillId } from '../data/missionsData';
 import { LINES } from '../data/lines';
 import { fill, makeProblem, speechParts, type Params, type Problem } from '../game/problems';
 import type { IsoWorld } from '../game/IsoWorld';
+import { GUESS, TIER_NAME, isReto } from '../game/brain';
 import { GlassButton } from './ui/GlassButton';
 import { BreathingModal } from './ui/BreathingModal';
 import { BottleArt, SquirrelArt, TankArt, type SquirrelMood } from './ui/Art';
@@ -23,6 +24,7 @@ export const STATION_ICONS: Record<string, any> = {
   'nivel-inundacion': Waves,
   'nivel-tormenta': CloudLightning,
   'nivel-incendio': Flame,
+  'reto-chispa': Sparkles,
 };
 const STEP_ICON = (s: MicroStep) =>
   s.type === 'counter' ? Backpack
@@ -32,7 +34,7 @@ const STEP_ICON = (s: MicroStep) =>
   : s.type === 'order' ? ListOrdered
   : BookOpen;
 
-const ETHICS = 'Motor Local Offline Activo (Sin Internet) · Confianza: Reglas Verificadas por tu Maestro · Recuerda: Soy un guía digital y no reemplazo a tu maestro';
+const ETHICS = 'IA local en tu equipo (sin internet) · Aprende de tus respuestas, no de tus datos · Soy un guía y no reemplazo a tu maestro';
 
 export interface MissionResult {
   mistakes: number;
@@ -45,11 +47,12 @@ interface Props {
   mission: Mission;
   world: IsoWorld | null;
   calm: boolean;
-  sunsLeftAfter: number;
+  /** Nivel de dificultad (1-4) que la IA local da a cada paso, con el progreso más reciente. */
+  tierOf: (s: MicroStep) => number;
   onExit: () => void;
   onComplete: (r: MissionResult) => string[];
   onHintUsed: () => void;
-  onSkill: (skills: SkillId[], ok: boolean, firstTry: boolean) => void;
+  onSkill: (skills: SkillId[], ok: boolean, firstTry: boolean, guess: number) => void;
   onChispaTap: () => void;
   onBreath: () => void;
 }
@@ -103,9 +106,6 @@ const TryBtn = ({ onClick, disabled, children = '¡Probar!' }: { onClick: () => 
   <GlassButton variant="emerald" size="lg" onClick={onClick} disabled={disabled}>
     <Check className="w-5 h-5" /> {children} <Key>Enter</Key>
   </GlassButton>
-);
-const Mystery = () => (
-  <span className="absolute inset-0 flex items-center justify-center text-4xl font-black text-sky-300" aria-hidden="true">?</span>
 );
 
 /** Candado numérico: el niño escribe el número (no hay opciones que adivinar). */
@@ -200,15 +200,14 @@ const CounterStep: FunctionalComponent<StepProps<'counter'>> = ({ step, problem,
         </div>
         <div className="relative flex flex-col items-center">
           <Backpack className="w-7 h-7 text-amber-500 mb-1" />
-          <TankArt value={poured * per} max={target * 1.3} mark={target} width={70} height={110} label={`Meta: ${target} litros`} />
-          {!done && <Mystery />}
-          <span className="text-sm font-black text-sky-700">{done ? `${poured * per} L` : `meta ${target} L`}</span>
+          <TankArt value={done ? poured * per : total} max={Math.max(target, total) * 1.3} mark={target} width={70} height={110} label={`Meta: ${target} litros`} />
+          <span className="text-sm font-black text-sky-700">{done ? poured * per : total} de {target} L</span>
         </div>
       </div>
       <p className="text-center text-base font-black text-slate-600" aria-live="polite">
         {done
           ? Array.from({ length: poured }).map((_, i) => (i + 1) * per).join(' → ') + (poured === n ? `  (${n} × ${per} = ${total})` : '')
-          : `Elegiste ${n} ${n === 1 ? step.data.item[0] : step.data.item[1]}`}
+          : n === 0 ? `Toca las ${step.data.item[1]}` : Array.from({ length: n }).map(() => per).join(' + ') + ` = ${total} L` + (total < target ? '  · faltan' : total > target ? '  · ¡sobran!' : '  · ¡justo!')}
       </p>
       <TryBtn onClick={test} disabled={done || n === 0} />
     </div>
@@ -239,11 +238,12 @@ const ShareStep: FunctionalComponent<StepProps<'share'>> = ({ step, problem, onS
             <span className={`w-14 h-16 rounded-t-2xl rounded-b-md flex items-center justify-center ${done ? (rest === 0 ? 'bg-emerald-400 text-white' : 'bg-rose-200 text-rose-700') : 'bg-[#c28a52] text-amber-100'}`}>
               <DoorOpen className="w-7 h-7" />
             </span>
-            <span className="text-sm font-black text-slate-700">{done ? each : '?'}</span>
+            <span className="text-sm font-black text-slate-700">{each || '?'}</span>
             <span className="text-[11px] font-bold text-slate-500">{s}</span>
           </div>
         ))}
       </div>
+      <LiveHint text={!each ? null : rest > 0 ? `${each} + ${each} + ${each} = ${each * 3}: quedan ${rest}` : rest < 0 ? `${each} + ${each} + ${each} = ${each * 3}: ¡faltan ${-rest}!` : `${each} + ${each} + ${each} = ${total}: ¡todos salen!`} good={rest === 0} />
       <Keypad value={value} setValue={setValue} onSubmit={test} locked={done} unit="por puerta" />
     </div>
   );
@@ -273,33 +273,47 @@ const NumberStep: FunctionalComponent<StepProps<'number'>> = ({ step, problem, w
       <div className="cozy-inset p-3 flex items-center justify-center gap-3 min-h-[110px]">
         {rising ? (
           <>
-            <span className="flex flex-col-reverse gap-1" aria-label={`${per} centímetros por hora`}>
-              {Array.from({ length: Math.min(8, done ? v : 1) }).map((_, i) => (
-                <span key={i} className={`w-16 h-3 rounded ${done && i >= answer ? 'bg-rose-300' : 'bg-sky-400'}`} />
-              ))}
-            </span>
-            <span className="text-xs font-black text-slate-500 w-16">{done ? `${v * per} cm` : `+${per} cm cada hora`}</span>
-            <span className="flex flex-col items-center">
-              <span className="w-1.5 h-16 bg-amber-400 rounded" />
-              <span className="text-xs font-black text-amber-700">{target} cm</span>
+            {/* Cada fila es una hora: el agua sube mientras el niño escribe y ve si llega a la raya */}
+            <span className="flex flex-col-reverse" aria-label={`${per} centímetros por hora`}>
+              {Array.from({ length: Math.max(answer + 1, Math.min(10, v)) }).map((_, i) => {
+                const wet = i < v;
+                const over = wet && i >= answer;
+                const line = i === answer - 1; // la raya de la meta está encima de esta fila
+                return (
+                  <span key={i} className={`relative flex items-center gap-2 h-[18px] ${line ? 'border-t-[3px] border-dashed border-amber-500' : ''}`}>
+                    <span className="w-14 text-right text-[11px] font-bold text-slate-400">hora {i + 1}</span>
+                    <span className={`w-24 h-[14px] rounded-sm transition-colors ${over ? 'bg-rose-400' : wet ? (v === answer ? 'bg-emerald-400' : 'bg-sky-400') : 'bg-white/70'}`} />
+                    <span className={`w-12 text-[12px] font-black ${wet ? 'text-sky-700' : 'text-slate-300'}`}>{(i + 1) * per} cm</span>
+                    {line && <span className="absolute -top-[13px] right-[-62px] px-1.5 rounded-md bg-amber-400 text-white text-[11px] font-black">{target} cm</span>}
+                  </span>
+                );
+              })}
             </span>
           </>
         ) : (
           <>
             <CloudLightning className="w-10 h-10 text-amber-500" />
             <span className="flex flex-wrap gap-1 max-w-[180px]" aria-label={`${s} segundos`}>
-              {Array.from({ length: s }).map((_, i) => (
-                <span key={i} className={`w-3.5 h-3.5 rounded-full ${done && v === answer && i % 3 === 2 ? 'bg-emerald-500' : 'bg-sky-300'}`} />
+              {Array.from({ length: Math.min(30, Math.max(s, v * 3)) }).map((_, i) => (
+                <span key={i} className={`w-3.5 h-3.5 rounded-full ${i % 3 === 2 ? 'mr-1.5' : ''} ${i >= s ? 'bg-rose-400' : i < v * 3 ? (v === answer ? 'bg-emerald-500' : 'bg-amber-400') : 'bg-sky-300'}`} />
               ))}
             </span>
             <Ear className="w-9 h-9 text-slate-500" />
           </>
         )}
       </div>
+      <LiveHint text={!v ? null : rising ? (v * per < target ? `${v * per} cm: todavía no llega` : v * per > target ? `${v * per} cm: ¡se pasa!` : `${v * per} cm: ¡llega justo!`) : v * 3 < s ? `${v * 3} segundos: faltan` : v * 3 > s ? `${v * 3} segundos: sobran` : `${v * 3} segundos: ¡justo!`} good={v === answer} />
       <Keypad value={value} setValue={setValue} onSubmit={test} locked={done} unit={step.data.unit} />
     </div>
   );
 };
+
+/** Lo que pasa con el número que escribió, en vivo: el niño se corrige solo antes de probar. */
+const LiveHint = ({ text, good }: { text: string | null; good: boolean }) => (
+  <p aria-live="polite" className={`self-center min-h-[30px] px-3 py-1 rounded-full text-sm font-black ${!text ? 'opacity-0' : good ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+    {text ?? '.'}
+  </p>
+);
 
 const PaperNote: FunctionalComponent<{ children: ComponentChildren; tilt?: number; className?: string }> = ({ children, tilt = 0, className = '' }) => (
   <div className={`paper relative px-4 pt-5 pb-3 ${className}`} style={{ transform: `rotate(${tilt}deg)` }}>
@@ -494,7 +508,7 @@ function stepSpeech(step: MicroStep, problem: Problem): (string | number)[] {
   return parts;
 }
 
-export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm, sunsLeftAfter, onExit, onComplete, onHintUsed, onSkill, onChispaTap, onBreath }) => {
+export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm, tierOf, onExit, onComplete, onHintUsed, onSkill, onChispaTap, onBreath }) => {
   const [phase, setPhase] = useState<'intro' | 'step' | 'done'>('intro');
   const [idx, setIdx] = useState(0);
   const [duo, setDuo] = useState(false);
@@ -509,7 +523,7 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
   const [chispa, setChispa] = useState<{ text: string; parts: (string | number)[]; mood: SquirrelMood; n: number }>({ text: mission.shortStory.join(' '), parts: [...mission.shortStory], mood: 'idle', n: 0 });
   const [breathing, setBreathing] = useState(false);
   const [newBadges, setNewBadges] = useState<string[]>([]);
-  const [sunsLeft] = useState(sunsLeftAfter);
+  const [tier, setTier] = useState(1);
 
   const step = mission.steps[idx];
   const isMath = mission.id === 'nivel-sismo' || mission.id === 'nivel-incendio'; // solo define el color de acento
@@ -540,7 +554,9 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
 
   const startProblem = (i: number, prev?: Problem, isDuo = duo) => {
     const s = mission.steps[i];
-    const p = makeProblem(s, prev);
+    const t = tierOf(s);
+    const p = makeProblem(s, prev, t);
+    setTier(t);
     setProblem(p);
     setPid((x) => x + 1);
     setOutcome(null);
@@ -554,7 +570,7 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
 
   const onSubmit: Submit = (r) => {
     const firstTry = tries === 0 && hint === 0;
-    onSkill(step.skills, r.ok, firstTry);
+    onSkill(step.skills, r.ok, firstTry, GUESS[step.type]);
     if (r.ok) {
       playStepCompleteSound();
       world?.cheer();
@@ -604,7 +620,7 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
     world?.cheer();
     setNewBadges(onComplete({ mistakes: totals.mistakes, struggledSteps: struggled, duo, hints: totals.hints }));
     setPhase('done');
-    talk(mission.offScreenChallenge.companionPrompt, {}, 'happy');
+    talk(LINES.retoNext, {}, 'happy');
   };
 
   const begin = (isDuo: boolean) => {
@@ -690,6 +706,11 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
                 </span>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-lg font-black text-slate-800 leading-tight">{step.title}</h3>
+                  {['counter', 'share', 'number'].includes(step.type) && (
+                    <span key={`t${pid}`} className={`inline-flex items-center gap-1 mt-0.5 mr-1 px-2 py-0.5 rounded-full text-[11px] font-black anim-hop ${['', 'bg-sky-100 text-sky-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-800', 'bg-violet-100 text-violet-700'][tier]}`} title="La IA local ajusta los números a cómo vas">
+                      <Sparkles className="w-3 h-3" /> {TIER_NAME[tier]}
+                    </span>
+                  )}
                   {practice > 0 && <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black">Ronda extra</span>}
                   {instructionLines.map((l) => (
                     <p key={l} className="text-[15px] leading-snug text-slate-700 font-medium">
@@ -728,7 +749,7 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
                 <div className="absolute inset-2 rounded-full border-4 border-dashed border-amber-100" />
                 <Award className="w-14 h-14 text-white" />
               </div>
-              <span className="cozy-ribbon !bg-amber-500 text-lg">¡Estación restaurada!</span>
+              <span className="cozy-ribbon !bg-amber-500 text-lg">{isReto(mission) ? '¡Reto superado!' : '¡Estación restaurada!'}</span>
               {newBadges.length > 0 && (
                 <div className="flex flex-wrap justify-center gap-2">
                   {newBadges.map((b) => (
@@ -739,18 +760,12 @@ export const MissionPanel: FunctionalComponent<Props> = ({ mission, world, calm,
                 </div>
               )}
               <div className="cozy-tile w-full p-3 flex items-center gap-3">
-                <span className="w-14 h-14 shrink-0 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center"><Footprints className="w-8 h-8" /></span>
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-wide text-sky-700">Fuera de la pantalla</p>
-                  <p className="font-bold text-slate-800 leading-snug">{mission.offScreenChallenge.actionPrompt}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5" aria-label={`Soles restantes: ${sunsLeft}`}>
-                {[0, 1, 2].map((i) => <Sun key={i} className={`w-7 h-7 ${i < sunsLeft ? 'text-amber-500 fill-amber-300' : 'text-[#e6d3ab]'}`} />)}
+                <span className="w-14 h-14 shrink-0 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center"><Sparkles className="w-8 h-8" /></span>
+                <p className="font-bold text-slate-800 leading-snug">Chispa ya prepara tu próximo reto con lo que más te cuesta.</p>
               </div>
               <div className="grid grid-cols-2 gap-2 w-full">
                 <GlassButton size="lg" onClick={() => setBreathing(true)}><Wind className="w-5 h-5" /> Respirar</GlassButton>
-                <GlassButton size="lg" variant="primary" onClick={onExit}><Check className="w-5 h-5" /> Ya lo hice</GlassButton>
+                <GlassButton size="lg" variant="primary" onClick={onExit}><Check className="w-5 h-5" /> ¡Listo!</GlassButton>
               </div>
             </div>
           )}
