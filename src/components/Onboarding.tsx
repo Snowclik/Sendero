@@ -1,11 +1,11 @@
 import type { FunctionalComponent } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { ArrowLeft, BookOpen, CloudRain, Compass, Heart, LifeBuoy, Lock, Plus, Shield, Smile, Sun, TreePine } from 'lucide-preact';
+import { ArrowLeft, BookOpen, Compass, Heart, Lock, Plus, Shield, Sun, TreePine } from 'lucide-preact';
 import { GlassButton } from './ui/GlassButton';
 import { SquirrelArt } from './ui/Art';
 import { playClickSound, sayText } from '../services/soundService';
 import { LINES } from '../data/lines';
-import type { AvatarIcon, Mood, StudentProfile } from '../services/storageService';
+import type { AvatarIcon, StudentProfile } from '../services/storageService';
 
 export const AVATARS: Record<AvatarIcon, any> = { Compass, Shield, BookOpen, TreePine, Sun, Heart };
 const AVATAR_TONE: Record<AvatarIcon, string> = {
@@ -107,31 +107,5 @@ export const ProfileScreen: FunctionalComponent<{
         </form>
       )}
     </Stage>
-  );
-};
-
-export const MOODS: { id: Mood; label: string; full: string; Icon: any; tone: string }[] = [
-  { id: 'tranquilo', label: '¡Listo!', full: 'Estoy tranquilo y listo', Icon: Smile, tone: 'bg-emerald-400 shadow-[0_6px_0_#059669]' },
-  { id: 'inquieto', label: 'Inquieto', full: 'Me siento inquieto / me cuesta concentrarme', Icon: CloudRain, tone: 'bg-sky-400 shadow-[0_6px_0_#0284c7]' },
-  { id: 'ayuda', label: 'Necesito ayuda', full: 'Estoy en albergue / necesito hablar con mi maestro', Icon: LifeBuoy, tone: 'bg-rose-400 shadow-[0_6px_0_#e11d48]' },
-];
-
-export const CheckInModal: FunctionalComponent<{ name: string; onPick: (m: Mood) => void }> = ({ name, onPick }) => {
-  useEffect(() => {
-    sayText(LINES.howAreYou);
-  }, []);
-  return (
-  <Stage say={`¿Cómo estás, ${name}?`}>
-    <div className="grid grid-cols-3 gap-3">
-      {MOODS.map(({ id, label, full, Icon, tone }) => (
-        <button key={id} aria-label={full} title={full} onClick={() => { playClickSound(); onPick(id); }} className="cozy-tile p-3 flex flex-col items-center gap-3 text-center">
-          <span className={`w-20 h-20 rounded-full flex items-center justify-center text-white ${tone}`}>
-            <Icon className="w-11 h-11" />
-          </span>
-          <span className="text-base font-black text-slate-700 leading-tight">{label}</span>
-        </button>
-      ))}
-    </div>
-  </Stage>
   );
 };

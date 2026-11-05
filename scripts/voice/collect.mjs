@@ -18,14 +18,13 @@ for (const m of MISSIONS) {
     const d = s.data;
     if (s.type === 'read') {
       d.options.forEach((o) => add(o.text));
-      d.variants.forEach((v) => { add(v.question); v.blocks.forEach((b) => add(b.text)); });
+      Object.values(d.why ?? {}).forEach(add);
+      d.variants.forEach((v) => { add(v.question); add(v.explain); v.blocks.forEach((b) => add(b.text)); });
     }
     if (s.type === 'sift') d.pairs.forEach((p) => { add(p.rumor.content); add(p.reliable.content); });
     if (s.type === 'order') d.items.forEach((i) => add(i.text));
-    if (s.type === 'vocab') d.words.forEach((w) => { add(w.say); add(w.meaning); add(w.word); });
   }
 }
-add('¿Qué es "{word}"?');
 for (const v of Object.values(LINES)) (Array.isArray(v) ? v : [v]).forEach(add);
 ACHIEVEMENTS.forEach((a) => add(a.name));
 for (let n = 0; n <= 200; n++) set.add(String(n));

@@ -1,10 +1,17 @@
 # Sendero
 
-Videojuego 100% offline de continuidad escolar en emergencias para niños de **8 a 10 años con TDAH**, centrado en **Matemáticas** y **Lectura Comprensiva**. Proyecto para el Reto 15 de #HACK4EDU; integra los 20 retos del torneo en una sola experiencia.
+Videojuego 100% offline para niños de **8 a 10 años con TDAH** que enseña **qué hacer en cada desastre natural**, practicando **Matemática** y **Español** en el camino. Proyecto para el Reto 15 de #HACK4EDU.
 
-Una tormenta dañó el valle. El jugador, acompañado de **Chispa la ardilla**, restaura 4 estaciones resolviendo problemas reales: agua potable, rumores falsos, un puente y el huerto de la abuela. El niño no ve "ejercicios": ve filtros que se encienden, un tanque que se llena y un puente que se construye.
+Después de un sismo de 7.7 en Panamá, el jugador recorre el valle con **Chispa la ardilla**. En cada estación aprende a reaccionar ante un desastre distinto:
 
-![Valle restaurado](docs/evolucion/3-menos-texto/valle-restaurado.png)
+| Nivel | Qué aprende | Matemática | Español |
+|---|---|---|---|
+| **Sismo** (Escuela) | Agáchate, cúbrete, agárrate; qué hacer en el aula, la calle o la cama | Litros de agua para la mochila de emergencia | Ordenar pasos |
+| **Inundación** (Orilla del Río) | Subir a lo alto, desconectar la luz, nunca cruzar un río crecido | En cuántas horas llega el agua | Leer avisos y detectar rumores |
+| **Tormenta eléctrica** (Campo Abierto) | Entrar a una casa, salir del agua, nunca bajo un árbol | Distancia del rayo: segundos ÷ 3 | Leer situaciones |
+| **Incendio** (Cabaña del Bosque) | Salir agachado, no abrir puertas calientes, detenerse-tirarse-rodar, llamar al 9-1-1 | Repartir vecinos por las salidas | Ordenar el plan de salida |
+
+![Menú principal](docs/evolucion/5-desastres-y-vestuario/menu.png)
 
 ## Cómo correrlo
 
@@ -22,19 +29,20 @@ No necesita internet en ningún momento: sin CDN, sin fuentes externas, sin APIs
 | Mecánica | Para qué (TDAH) |
 |---|---|
 | Vista isométrica fija; clic/toque o WASD para caminar | Cero manejo de cámara; funciona en tablets |
-| Faro y flecha hacia la siguiente estación; orden lineal | Menos decisiones, menos bloqueo ejecutivo |
+| Faro y flecha hacia el siguiente nivel; orden lineal | Menos decisiones, menos bloqueo ejecutivo |
 | Cada misión: 3 micro-pasos con pestañas de ícono | *Chunking*: nunca un problema largo de golpe |
-| Primero decides, luego el mundo muestra el resultado (tanque, puente, manómetro) | Predecir obliga a pensar; nada de "subir hasta que coincida" |
+| Primero decides, luego se muestra el resultado (mochila, medidor del río, puertas) | Predecir obliga a pensar; nada de "subir hasta que coincida" |
+| Al acertar, Chispa explica **por qué**; al elegir algo peligroso, explica el peligro | Se aprende la razón, no solo la respuesta |
 | Chispa da pistas al tocarla (pregunta, luego pista visual, luego ejemplo) | Tutor socrático: nunca da la respuesta |
 | Chispa narra cada paso con voz natural; textos de 1 a 10 palabras | Leer no es una barrera para entender |
 
 ### ¿Cómo se asegura que aprende y no toca botones al azar?
 
 1. **Números nuevos en cada intento.** Si fallas, el problema cambia; tocar opciones hasta acertar no funciona.
-2. **Respuestas escritas, no elegidas.** Repartir, pilares y perímetro se responden en un candado numérico, sin opciones que adivinar.
-3. **Lecturas con varias versiones.** Cada aviso tiene 3 versiones con respuestas distintas, y las opciones aparecen después de unos segundos: hay que leer o escuchar.
+2. **Respuestas escritas, no elegidas.** La crecida del río, la distancia del rayo y el reparto de vecinos se responden en un candado numérico, sin opciones que adivinar.
+3. **Situaciones con varias versiones.** Cada lectura tiene 3 situaciones con respuestas distintas, y las opciones aparecen después de unos segundos: hay que leer o escuchar.
 4. **Ronda extra.** Si necesitaste varios intentos, haces uno más con números nuevos para demostrar que entendiste (máximo 2, para no frustrar).
-5. **Estrellas con evidencia.** Cada habilidad (multiplicar, repartir, detectar rumores…) sube solo al acertar **a la primera**. Repetir estaciones es práctica real porque los problemas cambian.
+5. **Estrellas con evidencia.** Cada habilidad (sismos, dividir, detectar rumores…) sube solo al acertar **a la primera**. Repetir niveles es práctica real porque los problemas cambian.
 
 **Los 5 candados anti-adicción:**
 
@@ -44,9 +52,11 @@ No necesita internet en ningún momento: sin CDN, sin fuentes externas, sin APIs
 4. **Sin rankings ni rachas:** el niño solo se compara consigo mismo.
 5. **Micro-pasos:** cada misión se divide en 3.
 
-**Check-in emocional:** si el niño elige "Inquieto", se apagan las animaciones y el texto aparece frase por frase.
+**Mis logros:** 15 logros (9 escondidos, se ven como "?" con una pista) y la pestaña **Lo que aprendo**, con el avance en **Qué hacer**, **Matemática** y **Español**.
 
-**Mis logros:** 14 logros (8 escondidos, se ven como "?" con una pista) y la pestaña **Lo que aprendo**, con el avance en Matemática y Español por habilidad.
+**Vestuario:** el explorador se viste como quiera (gorra, colores, tono de piel, pelo…). Algunas prendas se ganan con logros: el casco con el nivel de sismo, las botas con la inundación, la mochila de emergencia con la tormenta, el chaleco reflectivo con el incendio y el sombrero pintao con un logro secreto. Todas se ganan con esfuerzo, ninguna al azar.
+
+Si el sistema pide reducir el movimiento, se apagan las animaciones.
 
 ## Evolución del proyecto
 
@@ -107,6 +117,21 @@ Se podía avanzar tocando opciones al azar sin entender nada. Ahora:
 |---|---|
 | ![](docs/evolucion/4-aprender-de-verdad/logros.png) | ![](docs/evolucion/4-aprender-de-verdad/lo-que-aprendo.png) |
 
+### Etapa 5: desastres naturales y vestuario
+
+Las estaciones del valle se convirtieron en **niveles por desastre**: sismo, inundación, tormenta eléctrica e incendio. Cada nivel enseña qué hacer, y Chispa explica por qué. Además:
+- Se quitaron las palabras en otros idiomas: el juego es solo en español.
+- Se quitó el check-in de ánimo.
+- Llegaron un **menú de inicio** y un **vestuario** con prendas que se ganan con logros.
+
+| Menú | Sismo | Tormenta |
+|---|---|---|
+| ![](docs/evolucion/5-desastres-y-vestuario/menu.png) | ![](docs/evolucion/5-desastres-y-vestuario/sismo.png) | ![](docs/evolucion/5-desastres-y-vestuario/tormenta.png) |
+
+| Vestuario | Con casco y chaleco en el mapa | Lo que aprendo |
+|---|---|---|
+| ![](docs/evolucion/5-desastres-y-vestuario/vestuario.png) | ![](docs/evolucion/5-desastres-y-vestuario/mapa-con-ropa.png) | ![](docs/evolucion/5-desastres-y-vestuario/lo-que-aprendo.png) |
+
 ## Voz de Chispa
 
 Las frases se graban una vez con [Piper](https://github.com/OHF-Voice/piper1-gpl), una voz neuronal que corre offline. La voz es `es_MX-claude-high`; su dataset es Apache-2.0. Los audios se guardan como MP3 en `public/voz/` (unos 4 MB). Las frases con números se arman uniendo fragmentos ("Cada filtro da" + "6" + "litros"). Si falta algún audio, el juego usa la voz del sistema como respaldo.
@@ -124,21 +149,25 @@ python scripts/voice/generate.py --model es_MX-claude-high.onnx   # requiere ffm
 
 ```
 src/
-  data/missionsData.ts      Misiones en JSON: plantillas con {números}, variantes de lectura, habilidades
+  data/missionsData.ts      Niveles en JSON: plantillas con {números}, situaciones, explicaciones, habilidades
+  data/wardrobe.ts          Prendas del vestuario (y qué logro las desbloquea)
   data/achievements.ts      Logros (visibles y escondidos)
   data/lines.ts             Frases de Chispa (todas se graban con voz)
   game/problems.ts          Genera un problema nuevo en cada intento
   game/IsoWorld.ts          Motor three.js: rejilla de bloques, A*, cámara isométrica, Chispa 3D
+  game/character.ts         Explorador de bloques con ropa intercambiable
   components/
-    GameApp.tsx             Flujo: perfil, check-in, mundo, misión, descanso, logros
-    MissionPanel.tsx        Los 8 tipos de micro-paso + Chispa como tutor socrático
+    GameApp.tsx             Flujo: menú, jugador, mundo, nivel, descanso, vestuario, logros
+    MainMenu.tsx            Pantalla de inicio
+    Wardrobe.tsx            Vestuario con vista previa 3D
+    MissionPanel.tsx        Los 6 tipos de micro-paso + Chispa como tutor socrático
     AchievementsModal.tsx   Mis logros + Lo que aprendo
     ui/Art.tsx              Ilustraciones SVG inline (Chispa, filtros, tanque, válvulas...)
   services/
     storageService.ts       Guardado (Rust en Tauri, localStorage en navegador), habilidades
     soundService.ts         Sonidos WebAudio + reproductor de la voz pregrabada
 scripts/voice/              Recolecta las frases y las graba con Piper
-src-tauri/src/lib.rs        Comandos Rust: guardado y carga atómicos
+src-tauri/src/lib.rs        Comandos Rust: guardado y carga atómicos, salir del juego
 ```
 
 **Rendimiento para equipos de gama baja:**

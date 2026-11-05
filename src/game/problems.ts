@@ -11,7 +11,6 @@ export interface Problem {
   answer: number | string; // número o id de opción
   variant?: number; // lectura / par de mensajes
   order?: string[]; // orden en que se muestran opciones o tarjetas
-  initial?: number[]; // válvulas
   max?: number; // casillas disponibles
 }
 
@@ -44,35 +43,24 @@ export function makeProblem(step: MicroStep, prev?: Problem): Problem {
 function generate(step: MicroStep, prev?: Problem): Problem {
   switch (step.type) {
     case 'counter': {
-      if (step.data.gen === 'filters') {
-        const per = pick([2, 3, 4, 5, 6]);
-        const n = pick([2, 3, 4, 5].filter((k) => k * per <= 30));
-        return { params: { per, target: per * n }, answer: n, max: 6 };
-      }
-      const per = pick([2, 3, 4, 6]); // el río mide 12 m (4 bloques del mapa)
-      return { params: { per, target: 12 }, answer: 12 / per, max: 6 };
+      // Mochila: botellas de {per} litros hasta {target} litros
+      const per = pick([1, 2, 3]);
+      const n = int(2, 5);
+      return { params: { per, target: per * n }, answer: n, max: 6 };
     }
     case 'share': {
       const each = int(3, 8);
       return { params: { total: each * 3 }, answer: each };
     }
-    case 'balance': {
-      const target = int(7, 12);
-      let initial = [int(1, 5), int(1, 5), int(1, 5)];
-      while (initial.reduce((a, b) => a + b, 0) === target) initial = [int(1, 5), int(1, 5), int(1, 5)];
-      return { params: { target }, answer: target, initial };
-    }
     case 'number': {
-      if (step.data.gen === 'pillars') {
-        const per = pick([20, 25, 30, 40, 50]);
-        const n = int(2, 4);
-        const weight = per * (n - 1) + pick([5, 10, 15].filter((r) => r < per));
-        return { params: { per, weight }, answer: Math.ceil(weight / per) };
+      if (step.data.gen === 'rising') {
+        const per = pick([5, 10]);
+        const n = int(2, 6);
+        return { params: { per, target: per * n }, answer: n };
       }
-      let w = int(2, 6);
-      let h = int(1, 4);
-      if (w === h) w = w === 6 ? 5 : w + 1;
-      return { params: { w, h }, answer: 2 * (w + h) };
+      // Tormenta: cada 3 segundos entre rayo y trueno = 1 km
+      const km = int(1, 5);
+      return { params: { s: km * 3 }, answer: km };
     }
     case 'read': {
       const variant = otherIndex(step.data.variants.length, prev?.variant);
@@ -85,13 +73,6 @@ function generate(step: MicroStep, prev?: Problem): Problem {
     }
     case 'order':
       return { params: {}, answer: step.data.correctOrder.join(','), order: shuffle(step.data.items.map((i) => i.id)) };
-    case 'vocab': {
-      const words = step.data.words.filter((w) => w.lang === 'es');
-      const k = otherIndex(words.length, prev?.variant);
-      const correct = words[k];
-      const wrong = shuffle(words.filter((w) => w !== correct)).slice(0, 2);
-      return { params: { word: correct.word }, answer: correct.meaning, variant: k, order: shuffle([correct, ...wrong].map((w) => w.meaning)) };
-    }
   }
 }
 

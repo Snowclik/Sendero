@@ -5,6 +5,7 @@
  * - En navegador: localStorage (siempre se escribe también como respaldo).
  */
 import type { SkillId } from '../data/missionsData';
+import { CATEGORIES, DEFAULT_OUTFIT, WARDROBE, type Outfit } from '../data/wardrobe';
 
 export type Mood = 'tranquilo' | 'inquieto' | 'ayuda';
 export type AvatarIcon = 'Compass' | 'Shield' | 'BookOpen' | 'TreePine' | 'Sun' | 'Heart';
@@ -25,6 +26,7 @@ export interface Stats {
   listens: number;
   missionsNoHint: number;
   missionsPerfect: number;
+  outfits: number; // veces que guardó ropa nueva
 }
 
 export interface StudentProfile {
@@ -42,6 +44,7 @@ export interface StudentProfile {
   skills: Partial<Record<SkillId, SkillProgress>>;
   stats: Stats;
   achievementsSeen: string[]; // para anunciar solo los nuevos
+  outfit: Outfit;
 }
 
 export interface SaveStore {
@@ -59,7 +62,7 @@ export const todayKey = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-const EMPTY_STATS: Stats = { chispaTaps: 0, breaths: 0, meters: 0, replays: 0, listens: 0, missionsNoHint: 0, missionsPerfect: 0 };
+const EMPTY_STATS: Stats = { chispaTaps: 0, breaths: 0, meters: 0, replays: 0, listens: 0, missionsNoHint: 0, missionsPerfect: 0, outfits: 0 };
 
 export function createProfile(name: string, avatarIcon: AvatarIcon): StudentProfile {
   return {
@@ -77,7 +80,15 @@ export function createProfile(name: string, avatarIcon: AvatarIcon): StudentProf
     skills: {},
     stats: { ...EMPTY_STATS },
     achievementsSeen: [],
+    outfit: { ...DEFAULT_OUTFIT },
   };
+}
+
+/** Ropa guardada válida: cualquier id desconocido vuelve al valor por defecto. */
+function validOutfit(o: any): Outfit {
+  const out = { ...DEFAULT_OUTFIT };
+  for (const c of CATEGORIES) if (o && WARDROBE[c.id].some((i) => i.id === o[c.id])) out[c.id] = o[c.id];
+  return out;
 }
 
 /** Completa campos faltantes (partidas viejas) y recarga los 3 soles si es un día nuevo. */
@@ -97,6 +108,7 @@ export function normalizeProfile(raw: any): StudentProfile {
     skills: raw?.skills && typeof raw.skills === 'object' ? raw.skills : {},
     stats: { ...EMPTY_STATS, ...(raw?.stats || {}) },
     achievementsSeen: Array.isArray(raw?.achievementsSeen) ? raw.achievementsSeen : [],
+    outfit: validOutfit(raw?.outfit),
   };
   if (p.lastPlayedDate !== todayKey()) {
     p.currentSunEnergy = MAX_SUNS;
@@ -148,14 +160,17 @@ export async function saveStore(store: SaveStore): Promise<void> {
   }
 }
 
-/** Registra el resultado de un problema en la habilidad correspondiente. */
-export function recordSkill(p: StudentProfile, skill: SkillId, ok: boolean, firstTry: boolean): StudentProfile {
-  const s = p.skills[skill] ?? { attempts: 0, correct: 0, firstTry: 0, mastery: 0 };
-  const next: SkillProgress = {
-    attempts: s.attempts + 1,
-    correct: s.correct + (ok ? 1 : 0),
-    firstTry: s.firstTry + (ok && firstTry ? 1 : 0),
-    mastery: Math.min(3, s.mastery + (ok && firstTry ? 1 : 0)),
-  };
-  return { ...p, skills: { ...p.skills, [skill]: next } };
+/** Registra el resultado de un problema en sus habilidades. */
+export function recordSkill(p: StudentProfile, skills: SkillId[], ok: boolean, firstTry: boolean): StudentProfile {
+  const all = { ...p.skills };
+  for (const skill of skills) {
+    const s = all[skill] ?? { attempts: 0, correct: 0, firstTry: 0, mastery: 0 };
+    all[skill] = {
+      attempts: s.attempts + 1,
+      correct: s.correct + (ok ? 1 : 0),
+      firstTry: s.firstTry + (ok && firstTry ? 1 : 0),
+      mastery: Math.min(3, s.mastery + (ok && firstTry ? 1 : 0)),
+    };
+  }
+  return { ...p, skills: all };
 }

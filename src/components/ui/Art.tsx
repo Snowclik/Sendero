@@ -147,3 +147,55 @@ export const RulerArt: FunctionalComponent<{ value: number; target: number; step
     </svg>
   );
 };
+
+/** Botella de agua para la mochila de emergencia. */
+export const BottleArt: FunctionalComponent<{ on: boolean; size?: number }> = ({ on, size = 44 }) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+    <rect x="19" y="4" width="10" height="6" rx="2" fill={on ? '#0369a1' : '#94a3b8'} />
+    <path d="M17 12h14l2 6v22a4 4 0 0 1-4 4H19a4 4 0 0 1-4-4V18z" fill={on ? '#7dd3fc' : '#e2e8f0'} stroke={on ? '#0ea5e9' : '#cbd5e1'} strokeWidth="2" />
+    {on && <rect x="17" y="24" width="14" height="18" rx="2" fill="#38bdf8" />}
+  </svg>
+);
+
+const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
+
+/** Miniatura de una prenda del vestuario (dibujo simple con el color de la prenda). */
+export const ItemThumb: FunctionalComponent<{ cat: string; id: string; color: number; size?: number }> = ({ cat, id, color, size = 56 }) => {
+  const c = hex(color);
+  const dark = 'rgba(0,0,0,.18)';
+  let art;
+  if (cat === 'hat') {
+    art =
+      id === 'ninguno' ? <path d="M14 34l20-20M14 14l20 20" stroke="#cbd5e1" strokeWidth="4" strokeLinecap="round" />
+      : id === 'gorra' ? <><path d="M10 30a14 14 0 0 1 28 0z" fill={c} /><rect x="24" y="28" width="18" height="5" rx="2.5" fill={dark} /></>
+      : id === 'gorro' ? <><path d="M10 32a14 14 0 0 1 28 0z" fill={c} /><rect x="9" y="30" width="30" height="6" rx="3" fill="#fff" /><circle cx="24" cy="15" r="4" fill="#fff" /></>
+      : id === 'casco' ? <><path d="M10 31a14 14 0 0 1 28 0z" fill={c} /><rect x="6" y="30" width="36" height="5" rx="2.5" fill="#eab308" /><rect x="22" y="17" width="4" height="13" fill="#fde047" /></>
+      : <><ellipse cx="24" cy="32" rx="20" ry="6" fill={c} /><rect x="14" y="16" width="20" height="16" rx="4" fill={c} /><rect x="14" y="25" width="20" height="4" fill="#1f2937" /></>;
+  } else if (cat === 'shirt') {
+    art = (
+      <>
+        <path d="M16 10l-9 6 4 8 5-3v19h16V21l5 3 4-8-9-6c-1 3-4 5-8 5s-7-2-8-5z" fill={c} />
+        {id === 'chaleco' && <><rect x="16" y="25" width="16" height="3" fill="#fef08a" /><rect x="16" y="32" width="16" height="3" fill="#fef08a" /></>}
+      </>
+    );
+  } else if (cat === 'pants') {
+    art = <path d="M14 8h20l2 32h-8l-4-20-4 20h-8z" fill={c} />;
+  } else if (cat === 'shoes') {
+    art = id === 'botas'
+      ? <path d="M14 8h10v22h12a4 4 0 0 1 4 4v6H10V12z" fill={c} />
+      : <path d="M8 24h14l4 6h12a4 4 0 0 1 4 4v4H8z" fill={c} />;
+  } else if (cat === 'bag') {
+    art = id === 'ninguna'
+      ? <path d="M14 34l20-20M14 14l20 20" stroke="#cbd5e1" strokeWidth="4" strokeLinecap="round" />
+      : <><rect x="12" y="12" width="24" height="28" rx="6" fill={c} /><path d="M18 12a6 6 0 0 1 12 0" stroke={c} strokeWidth="3" fill="none" /><rect x="16" y="26" width="16" height="8" rx="2" fill={dark} />{id === 'kit' && <path d="M24 17v8M20 21h8" stroke="#fff" strokeWidth="3" />}</>;
+  } else if (cat === 'skin') {
+    art = <><circle cx="24" cy="24" r="15" fill={c} /><circle cx="19" cy="22" r="2" fill="#1e293b" /><circle cx="29" cy="22" r="2" fill="#1e293b" /><path d="M19 29q5 4 10 0" stroke="#7a4a1f" strokeWidth="2" fill="none" /></>;
+  } else {
+    art = <><circle cx="24" cy="26" r="13" fill="#e0ac7e" /><path d="M10 24a14 14 0 0 1 28 0v-2a14 12 0 0 0-28 0z" fill={c} /><rect x="10" y="12" width="28" height="10" rx="5" fill={c} /></>;
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      {art}
+    </svg>
+  );
+};

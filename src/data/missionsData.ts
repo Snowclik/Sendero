@@ -1,16 +1,20 @@
 /**
  * missionsData.ts
- * Contenido de Sendero en JSON puro (portable a otro motor, p. ej. Roblox).
+ * Niveles de Sendero: qué hacer en cada desastre natural (contexto: sismo de 7.7 en Panamá).
+ * Cada nivel mezcla Prevención + Matemática + Español. JSON puro (portable a otro motor, p. ej. Roblox).
  *
  * Anti "tocar al azar":
  * - Los textos son plantillas con {parametros}: cada intento genera números nuevos (ver game/problems.ts).
- * - Las lecturas tienen varias versiones: la respuesta depende de lo que dice el texto ese día.
- * Textos cortos a propósito (TDAH): instrucción <= 10 palabras, pistas <= 12.
+ * - Las lecturas tienen varias situaciones: la respuesta depende de lo que dice el texto.
+ * - Al acertar, Chispa explica POR QUÉ; al elegir algo peligroso, explica el peligro.
+ * Textos cortos a propósito (TDAH): instrucción <= 12 palabras, pistas <= 12.
+ * Protocolos basados en recomendaciones generales de protección civil (SINAPROC / Cruz Roja).
  */
 
 export type IconKey =
-  | 'Bird' | 'CloudRain' | 'Leaf' | 'Backpack' | 'Users' | 'Footprints' | 'Droplet' | 'Sprout' | 'Mountain' | 'Home'
-  | 'School' | 'Sun' | 'Wind' | 'Waves' | 'Shovel';
+  | 'Shield' | 'Hand' | 'ArrowDownToLine' | 'BedDouble' | 'School' | 'Activity' | 'Zap' | 'Footprints'
+  | 'Mountain' | 'Waves' | 'Unplug' | 'Backpack' | 'CloudRain' | 'Droplet' | 'Home' | 'Sun' | 'CloudLightning'
+  | 'TreePine' | 'Clock' | 'Wind' | 'DoorClosed' | 'DoorOpen' | 'Flame' | 'Shirt' | 'Megaphone' | 'Phone';
 
 export interface TextBlock {
   text: string;
@@ -24,27 +28,30 @@ export interface SocraticHints {
 }
 
 export type SkillId =
-  | 'multiplicar' | 'repartir' | 'sumar' | 'medir' | 'perimetro'
-  | 'avisos' | 'rumores' | 'secuencias' | 'causa' | 'palabras';
+  | 'multiplicar' | 'dividir' | 'repartir'
+  | 'avisos' | 'rumores' | 'secuencias'
+  | 'sismo' | 'inundacion' | 'tormenta' | 'incendio';
 
-export const SKILLS: { id: SkillId; name: string; subject: 'matematica' | 'espanol' }[] = [
+export type Subject = 'prevencion' | 'matematica' | 'espanol';
+
+export const SKILLS: { id: SkillId; name: string; subject: Subject }[] = [
+  { id: 'sismo', name: 'Sismos', subject: 'prevencion' },
+  { id: 'inundacion', name: 'Inundaciones', subject: 'prevencion' },
+  { id: 'tormenta', name: 'Tormentas eléctricas', subject: 'prevencion' },
+  { id: 'incendio', name: 'Incendios', subject: 'prevencion' },
   { id: 'multiplicar', name: 'Multiplicar', subject: 'matematica' },
+  { id: 'dividir', name: 'Dividir', subject: 'matematica' },
   { id: 'repartir', name: 'Repartir', subject: 'matematica' },
-  { id: 'sumar', name: 'Sumar', subject: 'matematica' },
-  { id: 'medir', name: 'Medir', subject: 'matematica' },
-  { id: 'perimetro', name: 'Perímetro', subject: 'matematica' },
   { id: 'avisos', name: 'Entender avisos', subject: 'espanol' },
   { id: 'rumores', name: 'Detectar rumores', subject: 'espanol' },
   { id: 'secuencias', name: 'Ordenar pasos', subject: 'espanol' },
-  { id: 'causa', name: 'Causa y efecto', subject: 'espanol' },
-  { id: 'palabras', name: 'Palabras nuevas', subject: 'espanol' },
 ];
 
 interface StepBase {
   title: string;
   instruction: string; // plantilla: {per}, {target}...
   highlightWords?: string[]; // plantillas
-  skill: SkillId;
+  skills: SkillId[];
   duoRole?: 'A' | 'B' | 'AB';
   socraticHints: SocraticHints; // plantillas
 }
@@ -63,25 +70,29 @@ export interface SiftMessage {
 }
 
 export type MicroStep =
-  | (StepBase & { type: 'counter'; data: { gen: 'filters' | 'beams'; item: [string, string]; unit: string } })
+  | (StepBase & { type: 'counter'; data: { gen: 'bottles'; item: [string, string]; unit: string } })
   | (StepBase & { type: 'share'; data: { unit: string; sectors: string[] } })
-  | (StepBase & { type: 'balance'; data: { valves: string[] } })
-  | (StepBase & { type: 'number'; data: { gen: 'pillars' | 'perimeter'; unit: string } })
+  | (StepBase & { type: 'number'; data: { gen: 'rising' | 'thunder'; unit: string } })
   | (StepBase & {
       type: 'read';
-      data: { source: string; badge: string; options: ReadOption[]; variants: { blocks: TextBlock[]; question: string; answer: string }[] };
+      data: {
+        source: string;
+        badge: string;
+        options: ReadOption[];
+        why?: Record<string, string>; // por qué una opción es peligrosa
+        variants: { blocks: TextBlock[]; question: string; answer: string; explain: string }[];
+      };
     })
   | (StepBase & { type: 'sift'; data: { pairs: { reliable: SiftMessage; rumor: SiftMessage }[] } })
-  | (StepBase & { type: 'order'; data: { items: ReadOption[]; correctOrder: string[] } })
-  | (StepBase & { type: 'vocab'; data: { words: { language: string; word: string; meaning: string; say: string; lang: 'es' | 'en' }[] } });
+  | (StepBase & { type: 'order'; data: { items: ReadOption[]; correctOrder: string[] } });
 
-export type MissionId = 'mision-1-agua' | 'mision-2-rumor' | 'mision-3-puente' | 'mision-4-bosque';
+export type MissionId = 'nivel-sismo' | 'nivel-inundacion' | 'nivel-tormenta' | 'nivel-incendio';
 
 export interface Mission {
   id: MissionId;
   stationName: string;
   title: string;
-  subject: 'Matemáticas' | 'Lectura Comprensiva';
+  disaster: string;
   shortStory: [string, string];
   squirrelCall: string;
   duoRoles?: { A: string; B: string };
@@ -91,125 +102,190 @@ export interface Mission {
 
 export const MISSIONS: Mission[] = [
   // ==========================================================================
-  // MISIÓN 1 · Planta de agua (multiplicar, repartir, sumar)
+  // NIVEL 1 · SISMO
   // ==========================================================================
   {
-    id: 'mision-1-agua',
-    stationName: 'Planta de Agua',
-    title: 'La Planta Potabilizadora del Río',
-    subject: 'Matemáticas',
-    shortStory: ['El río creció con la lluvia.', 'El albergue necesita agua limpia.'],
-    squirrelCall: '¡El agua está sucia! Vamos a la planta.',
+    id: 'nivel-sismo',
+    stationName: 'Escuela',
+    title: '¡Tiembla la tierra!',
+    disaster: 'Sismo',
+    shortStory: ['Hubo un sismo fuerte en Panamá.', 'Aprendamos qué hacer si vuelve a temblar.'],
+    squirrelCall: '¡Tembló la tierra! Vamos a la escuela.',
     steps: [
       {
-        type: 'counter',
-        skill: 'multiplicar',
-        title: 'Enciende los filtros',
-        instruction: 'Cada filtro da {per} litros. Necesitamos {target} litros.',
-        highlightWords: ['{per} litros', '{target} litros'],
-        data: { gen: 'filters', item: ['filtro', 'filtros'], unit: 'litros' },
+        type: 'read',
+        skills: ['sismo', 'avisos'],
+        title: '¿Dónde estás?',
+        instruction: '',
         socraticHints: {
-          level1_question: '¿Cuántos litros dan 2 filtros de {per}?',
+          level1_question: '¿Qué te puede caer encima ahí?',
+          level2_visual: 'Lo más importante es proteger tu cabeza.',
+          level3_analogy: 'Como una tortuga: busca un caparazón que te tape.',
+        },
+        data: {
+          source: 'Chispa',
+          badge: 'Situación',
+          options: [
+            { id: 'mesa', text: 'Meterme bajo la mesa', icon: 'Shield' },
+            { id: 'postes', text: 'Alejarme de postes y cables', icon: 'Zap' },
+            { id: 'almohada', text: 'Taparme la cabeza con la almohada', icon: 'BedDouble' },
+            { id: 'ventana', text: 'Correr a la ventana', icon: 'Wind' },
+          ],
+          why: { ventana: 'Las ventanas se pueden romper. ¡Aléjate de ellas!' },
+          variants: [
+            {
+              blocks: [
+                { text: 'Estás en el aula.', icon: 'School' },
+                { text: 'La tierra empieza a temblar.', icon: 'Activity' },
+              ],
+              question: '¿Qué haces?',
+              answer: 'mesa',
+              explain: '¡Bien! La mesa te protege de lo que cae.',
+            },
+            {
+              blocks: [
+                { text: 'Estás en la calle.', icon: 'Footprints' },
+                { text: 'Empieza a temblar fuerte.', icon: 'Activity' },
+              ],
+              question: '¿Qué haces?',
+              answer: 'postes',
+              explain: '¡Bien! Los postes y cables pueden caer.',
+            },
+            {
+              blocks: [
+                { text: 'Estás en tu cama, de noche.', icon: 'BedDouble' },
+                { text: 'La cama se mueve.', icon: 'Activity' },
+              ],
+              question: '¿Qué haces?',
+              answer: 'almohada',
+              explain: '¡Bien! Quédate en la cama y protege tu cabeza.',
+            },
+          ],
+        },
+      },
+      {
+        type: 'order',
+        skills: ['secuencias', 'sismo'],
+        title: 'Cuando tiembla',
+        instruction: 'Toca los pasos en orden.',
+        socraticHints: {
+          level1_question: '¿Qué haces primero: bajar o taparte?',
+          level2_visual: 'Primero bajas, luego te tapas, al final te agarras.',
+          level3_analogy: 'Como una tortuga: baja, se esconde y se queda quieta.',
+        },
+        data: {
+          items: [
+            { id: 'agachate', text: 'Agáchate', icon: 'ArrowDownToLine' },
+            { id: 'cubrete', text: 'Cúbrete la cabeza', icon: 'Shield' },
+            { id: 'agarrate', text: 'Agárrate fuerte', icon: 'Hand' },
+          ],
+          correctOrder: ['agachate', 'cubrete', 'agarrate'],
+        },
+      },
+      {
+        type: 'counter',
+        skills: ['multiplicar', 'sismo'],
+        title: 'Mochila de emergencia',
+        instruction: 'Cada botella tiene {per} litros. Necesitamos {target} litros.',
+        highlightWords: ['{per} litros', '{target} litros'],
+        data: { gen: 'bottles', item: ['botella', 'botellas'], unit: 'litros' },
+        socraticHints: {
+          level1_question: '¿Cuántos litros dan 2 botellas de {per}?',
           level2_visual: 'Cuenta de {per} en {per} hasta llegar a {target}.',
           level3_analogy: 'Una caja trae {per} huevos. ¿Cuántas cajas para {target}?',
         },
       },
-      {
-        type: 'share',
-        skill: 'repartir',
-        title: 'Reparte el agua',
-        instruction: 'Hay {total} litros. Da lo mismo a los 3 lugares.',
-        highlightWords: ['{total} litros', 'lo mismo'],
-        data: { unit: 'litros', sectors: ['Salud', 'Familias', 'Cocina'] },
-        socraticHints: {
-          level1_question: '¿Qué número, 3 veces, da {total}?',
-          level2_visual: 'Haz 3 montones iguales con {total} gotas.',
-          level3_analogy: '6 dulces para 3 amigos: 2 cada uno. ¿Y {total}?',
-        },
-      },
-      {
-        type: 'balance',
-        skill: 'sumar',
-        title: 'Ajusta la presión',
-        instruction: 'Las 3 válvulas deben sumar {target}.',
-        highlightWords: ['sumar {target}'],
-        data: { valves: ['Norte', 'Centro', 'Sur'] },
-        socraticHints: {
-          level1_question: '¿Cuánto suman ahora? ¿Cuánto falta?',
-          level2_visual: 'Suma de dos en dos: primero dos válvulas, luego la otra.',
-          level3_analogy: 'Como una balanza: pon o quita poquito.',
-        },
-      },
     ],
     offScreenChallenge: {
-      actionPrompt: 'Revisa que ningún grifo gotee.',
+      actionPrompt: 'Busca en tu casa un lugar seguro, lejos de ventanas.',
       breathingSeconds: 15,
-      companionPrompt: '¡Bien! Cuéntale a alguien cómo cuidar el agua.',
+      companionPrompt: '¡Muy bien! Enséñale a tu familia: agáchate, cúbrete, agárrate.',
     },
   },
 
   // ==========================================================================
-  // MISIÓN 2 · Tablón del pueblo (avisos, rumores, secuencias)
+  // NIVEL 2 · INUNDACIÓN (Modo Dúo)
   // ==========================================================================
   {
-    id: 'mision-2-rumor',
-    stationName: 'Tablón del Pueblo',
-    title: 'El Rumor de la Quebrada',
-    subject: 'Lectura Comprensiva',
-    shortStory: ['Llegaron mensajes al pueblo.', '¿Cuál dice la verdad?'],
-    squirrelCall: '¡Hay mensajes nuevos en el tablón!',
+    id: 'nivel-inundacion',
+    stationName: 'Orilla del Río',
+    title: '¡Sube el río!',
+    disaster: 'Inundación',
+    shortStory: ['Llovió mucho y el río está creciendo.', 'Aprendamos a estar a salvo del agua.'],
+    squirrelCall: '¡El río está creciendo! Vamos a la orilla.',
+    duoRoles: { A: 'Explorador A · Lee', B: 'Explorador B · Calcula' },
     steps: [
       {
         type: 'read',
-        skill: 'avisos',
-        title: 'Lee el aviso',
+        skills: ['avisos', 'inundacion'],
+        duoRole: 'A',
+        title: 'Aviso de lluvia',
         instruction: '',
         socraticHints: {
           level1_question: '¿Qué dice la segunda frase?',
-          level2_visual: 'Busca la palabra que dice a dónde ir.',
-          level3_analogy: 'Un aviso es como un mapa: dice a dónde ir.',
+          level2_visual: 'La segunda frase dice qué hacer.',
+          level3_analogy: 'Un aviso es como una receta: dice qué hacer.',
         },
         data: {
           source: 'Protección Civil',
           badge: 'Oficial',
           options: [
-            { id: 'alta', text: 'Ir por la Ruta Alta', icon: 'Mountain' },
-            { id: 'albergue', text: 'Quedarse en el albergue', icon: 'Home' },
-            { id: 'centro', text: 'Ir al Centro Comunal', icon: 'School' },
-            { id: 'puente', text: 'Cruzar el puente', icon: 'Waves' },
+            { id: 'alto', text: 'Subir a un lugar alto', icon: 'Mountain' },
+            { id: 'luz', text: 'Desconectar la luz', icon: 'Unplug' },
+            { id: 'papeles', text: 'Guardar papeles en bolsa', icon: 'Backpack' },
+            { id: 'cruzar', text: 'Cruzar el río caminando', icon: 'Waves' },
           ],
+          why: { cruzar: 'El agua del río te puede arrastrar. ¡Nunca lo cruces!' },
           variants: [
             {
               blocks: [
-                { text: 'La quebrada subió.', icon: 'CloudRain' },
-                { text: 'Caminen por la Ruta Alta, con calma.', icon: 'Mountain' },
+                { text: 'El agua entra a las casas.', icon: 'CloudRain' },
+                { text: 'Suban a un lugar alto ya.', icon: 'Mountain' },
               ],
               question: '¿Qué pide el aviso?',
-              answer: 'alta',
+              answer: 'alto',
+              explain: '¡Bien! Lo alto es seguro cuando sube el agua.',
             },
             {
               blocks: [
-                { text: 'Viene una tormenta fuerte.', icon: 'Wind' },
-                { text: 'Nadie salga del albergue hoy.', icon: 'Home' },
+                { text: 'El agua llegó a los enchufes.', icon: 'Droplet' },
+                { text: 'Desconecten la luz de la casa.', icon: 'Unplug' },
               ],
               question: '¿Qué pide el aviso?',
-              answer: 'albergue',
+              answer: 'luz',
+              explain: '¡Bien! El agua y la electricidad juntas son peligrosas.',
             },
             {
               blocks: [
-                { text: 'La escuela está mojada.', icon: 'CloudRain' },
-                { text: 'Las clases son en el Centro Comunal.', icon: 'School' },
+                { text: 'Pronto deben salir de casa.', icon: 'Home' },
+                { text: 'Guarden sus papeles en bolsas.', icon: 'Backpack' },
               ],
-              question: '¿A dónde van los niños?',
-              answer: 'centro',
+              question: '¿Qué pide el aviso?',
+              answer: 'papeles',
+              explain: '¡Bien! Así tus papeles no se mojan.',
             },
           ],
         },
       },
       {
+        type: 'number',
+        skills: ['dividir', 'inundacion'],
+        duoRole: 'B',
+        title: '¿Cuándo llega el agua?',
+        instruction: 'El agua sube {per} centímetros cada hora. ¿En cuántas horas llega a {target}?',
+        highlightWords: ['{per} centímetros', '{target}'],
+        data: { gen: 'rising', unit: 'horas' },
+        socraticHints: {
+          level1_question: '¿Cuánto sube en 2 horas?',
+          level2_visual: 'Suma {per} cada hora hasta llegar a {target}.',
+          level3_analogy: 'Si subes {per} escalones por minuto, ¿cuánto tardas en {target}?',
+        },
+      },
+      {
         type: 'sift',
-        skill: 'rumores',
-        title: 'Usa la lupa',
+        skills: ['rumores', 'inundacion'],
+        duoRole: 'AB',
+        title: '¿Rumor o verdad?',
         instruction: 'Mira quién escribió cada mensaje.',
         highlightWords: ['quién escribió'],
         socraticHints: {
@@ -220,243 +296,236 @@ export const MISSIONS: Mission[] = [
         data: {
           pairs: [
             {
-              rumor: { content: '¡¡Todo se inunda YA!! Pásalo a todos.', author: 'Sin firma', date: 'Sin fecha', tone: 'Asusta' },
-              reliable: { content: 'Clases en el Centro Comunal. Lleven mochila.', author: 'Comité Escolar', date: 'Hoy, 9:00', tone: 'Tranquilo' },
+              rumor: { content: '¡¡La represa se rompió!! Corran. Pásalo.', author: 'Sin firma', date: 'Sin fecha', tone: 'Asusta' },
+              reliable: { content: 'La represa está bien. Sigan en zona alta.', author: 'Protección Civil', date: 'Hoy, 7:00', tone: 'Tranquilo' },
             },
             {
-              rumor: { content: '¡¡El puente se cayó!! Nadie sabe más. Reenvía.', author: 'Sin firma', date: 'Sin fecha', tone: 'Asusta' },
-              reliable: { content: 'El puente está cerrado. Usen la Ruta Alta.', author: 'Protección Civil', date: 'Hoy, 7:30', tone: 'Tranquilo' },
+              rumor: { content: '¡¡El agua de la llave está envenenada!! Reenvía.', author: 'Sin firma', date: 'Sin fecha', tone: 'Asusta' },
+              reliable: { content: 'Hiervan el agua antes de tomarla.', author: 'Ministerio de Salud', date: 'Hoy, 8:00', tone: 'Tranquilo' },
             },
             {
-              rumor: { content: '¡¡No tomen agua nunca más!! Lo dijo alguien.', author: 'Sin firma', date: 'Sin fecha', tone: 'Asusta' },
-              reliable: { content: 'Hiervan el agua antes de tomarla.', author: 'Centro de Salud', date: 'Hoy, 8:00', tone: 'Tranquilo' },
+              rumor: { content: '¡¡Ya pasó todo, crucen el río!! Pásalo.', author: 'Sin firma', date: 'Sin fecha', tone: 'Apura' },
+              reliable: { content: 'No crucen ríos crecidos. Esperen el aviso.', author: 'Protección Civil', date: 'Hoy, 9:30', tone: 'Tranquilo' },
+            },
+          ],
+        },
+      },
+    ],
+    offScreenChallenge: {
+      actionPrompt: 'Mete tus papeles importantes en una bolsa plástica.',
+      breathingSeconds: 15,
+      companionPrompt: '¡Bien! Recuerda: nunca cruces un río crecido.',
+    },
+  },
+
+  // ==========================================================================
+  // NIVEL 3 · TORMENTA ELÉCTRICA
+  // ==========================================================================
+  {
+    id: 'nivel-tormenta',
+    stationName: 'Campo Abierto',
+    title: '¡Rayos y truenos!',
+    disaster: 'Tormenta eléctrica',
+    shortStory: ['Viene una tormenta con rayos.', 'Aprendamos dónde protegernos.'],
+    squirrelCall: '¡Se oyen truenos! Vamos al campo.',
+    steps: [
+      {
+        type: 'number',
+        skills: ['dividir', 'tormenta'],
+        title: '¿Qué tan lejos cayó?',
+        instruction: 'Contaste {s} segundos del rayo al trueno. Cada 3 segundos es 1 kilómetro.',
+        highlightWords: ['{s} segundos', '3 segundos', '1 kilómetro'],
+        data: { gen: 'thunder', unit: 'km' },
+        socraticHints: {
+          level1_question: '¿Cuántas veces cabe 3 en {s}?',
+          level2_visual: 'Cuenta de 3 en 3 hasta llegar a {s}.',
+          level3_analogy: '{s} galletas en bolsas de 3. ¿Cuántas bolsas?',
+        },
+      },
+      {
+        type: 'read',
+        skills: ['avisos', 'tormenta'],
+        title: '¿Dónde te proteges?',
+        instruction: '',
+        socraticHints: {
+          level1_question: '¿Qué cosas atraen a los rayos?',
+          level2_visual: 'Los rayos buscan lo alto, el agua y el metal.',
+          level3_analogy: 'Como la lluvia: un techo te protege.',
+        },
+        data: {
+          source: 'Chispa',
+          badge: 'Situación',
+          options: [
+            { id: 'casa', text: 'Entrar a una casa', icon: 'Home' },
+            { id: 'salir', text: 'Salir del agua rápido', icon: 'Waves' },
+            { id: 'desconectar', text: 'Desconectar los aparatos', icon: 'Unplug' },
+            { id: 'arbol', text: 'Esconderme bajo un árbol', icon: 'TreePine' },
+          ],
+          why: { arbol: 'Los árboles atraen los rayos. ¡Nunca te pongas debajo!' },
+          variants: [
+            {
+              blocks: [
+                { text: 'Estás jugando en el campo.', icon: 'Sun' },
+                { text: 'Empieza a tronar fuerte.', icon: 'CloudLightning' },
+              ],
+              question: '¿Qué haces?',
+              answer: 'casa',
+              explain: '¡Bien! Una casa te protege de los rayos.',
+            },
+            {
+              blocks: [
+                { text: 'Estás nadando en el río.', icon: 'Waves' },
+                { text: 'Se ve un rayo a lo lejos.', icon: 'CloudLightning' },
+              ],
+              question: '¿Qué haces?',
+              answer: 'salir',
+              explain: '¡Bien! El agua lleva la electricidad del rayo.',
+            },
+            {
+              blocks: [
+                { text: 'Estás en casa viendo la tele.', icon: 'Home' },
+                { text: 'Caen rayos muy cerca.', icon: 'CloudLightning' },
+              ],
+              question: '¿Qué haces?',
+              answer: 'desconectar',
+              explain: '¡Bien! Así los rayos no dañan los aparatos.',
             },
           ],
         },
       },
       {
         type: 'order',
-        skill: 'secuencias',
-        title: 'Plan de seguridad',
+        skills: ['secuencias', 'tormenta'],
+        title: 'Cuando hay tormenta',
         instruction: 'Toca los pasos en orden.',
         socraticHints: {
-          level1_question: '¿Qué guardas antes de salir?',
-          level2_visual: 'Primero preparo, luego reúno, al final camino.',
-          level3_analogy: 'Para ir a la escuela: mochila, adiós, salir.',
+          level1_question: '¿Qué pasa primero en una tormenta?',
+          level2_visual: 'Primero oyes, luego entras, al final esperas.',
+          level3_analogy: 'Como cruzar la calle: miras, esperas y cruzas.',
         },
         data: {
           items: [
-            { id: 'guardar', text: 'Guardar cuadernos', icon: 'Backpack' },
-            { id: 'avisar', text: 'Reunir a la familia', icon: 'Users' },
-            { id: 'caminar', text: 'Caminar juntos', icon: 'Footprints' },
+            { id: 'trueno', text: 'Oyes un trueno', icon: 'CloudLightning' },
+            { id: 'entrar', text: 'Entras a la casa', icon: 'Home' },
+            { id: 'esperar', text: 'Esperas 30 minutos', icon: 'Clock' },
           ],
-          correctOrder: ['guardar', 'avisar', 'caminar'],
+          correctOrder: ['trueno', 'entrar', 'esperar'],
         },
       },
     ],
     offScreenChallenge: {
-      actionPrompt: 'Escribe el nombre de tu maestro en un papel.',
+      actionPrompt: 'Cuenta en voz alta: un elefante, dos elefantes, tres elefantes.',
       breathingSeconds: 15,
-      companionPrompt: '¡Gran detective! Pregunta dónde están los documentos.',
+      companionPrompt: '¡Así se cuentan los segundos entre el rayo y el trueno!',
     },
   },
 
   // ==========================================================================
-  // MISIÓN 3 · Puente (medir, multiplicar, perímetro) en Modo Dúo
+  // NIVEL 4 · INCENDIO
   // ==========================================================================
   {
-    id: 'mision-3-puente',
-    stationName: 'Puente de la Escuela',
-    title: 'El Puente de la Escuela',
-    subject: 'Matemáticas',
-    shortStory: ['El puente tiene tablas sueltas.', '¡Vamos a arreglarlo!'],
-    squirrelCall: '¡El puente está roto! Hay que arreglarlo.',
-    duoRoles: { A: 'Explorador A · Medidas', B: 'Explorador B · Resistencia' },
+    id: 'nivel-incendio',
+    stationName: 'Cabaña del Bosque',
+    title: '¡Hay humo!',
+    disaster: 'Incendio',
+    shortStory: ['Después del sismo, hay riesgo de incendios.', 'Aprendamos a salir a salvo.'],
+    squirrelCall: 'Huele a humo en la cabaña. ¡Vamos!',
     steps: [
       {
-        type: 'counter',
-        skill: 'medir',
-        duoRole: 'A',
-        title: 'Pon las vigas',
-        instruction: 'El río mide {target} metros. Cada viga, {per} metros.',
-        highlightWords: ['{target} metros', '{per} metros'],
-        data: { gen: 'beams', item: ['viga', 'vigas'], unit: 'metros' },
+        type: 'read',
+        skills: ['avisos', 'incendio'],
+        title: '¿Qué haces?',
+        instruction: '',
         socraticHints: {
-          level1_question: '¿Cuántas veces cabe {per} en {target}?',
-          level2_visual: 'Salta de {per} en {per} hasta {target}.',
-          level3_analogy: '¿Cuántas piezas de {per} hacen {target}?',
+          level1_question: '¿Hacia dónde sube el humo?',
+          level2_visual: 'El humo sube. El fuego quema. Piensa en eso.',
+          level3_analogy: 'El humo es como un globo: siempre sube.',
+        },
+        data: {
+          source: 'Chispa',
+          badge: 'Situación',
+          options: [
+            { id: 'agachado', text: 'Salir agachado', icon: 'ArrowDownToLine' },
+            { id: 'otra', text: 'No abrir y buscar otra salida', icon: 'DoorClosed' },
+            { id: 'rodar', text: 'Detenerme, tirarme y rodar', icon: 'Activity' },
+            { id: 'esconder', text: 'Esconderme en el armario', icon: 'DoorOpen' },
+          ],
+          why: { esconder: 'Nunca te escondas. ¡Sal y avisa!' },
+          variants: [
+            {
+              blocks: [
+                { text: 'Hay humo en el cuarto.', icon: 'Wind' },
+                { text: 'El humo sube hacia el techo.', icon: 'Wind' },
+              ],
+              question: '¿Qué haces?',
+              answer: 'agachado',
+              explain: '¡Bien! Abajo hay aire limpio.',
+            },
+            {
+              blocks: [
+                { text: 'Tocas la puerta y está caliente.', icon: 'DoorClosed' },
+                { text: 'Detrás puede haber fuego.', icon: 'Flame' },
+              ],
+              question: '¿Qué haces?',
+              answer: 'otra',
+              explain: '¡Bien! Si la puerta quema, busca otra salida.',
+            },
+            {
+              blocks: [
+                { text: 'Una chispa cayó en tu ropa.', icon: 'Flame' },
+                { text: 'Tu camisa empieza a quemarse.', icon: 'Shirt' },
+              ],
+              question: '¿Qué haces?',
+              answer: 'rodar',
+              explain: '¡Bien! Rodar por el suelo apaga el fuego.',
+            },
+          ],
         },
       },
       {
-        type: 'number',
-        skill: 'multiplicar',
-        duoRole: 'B',
-        title: 'Pilares fuertes',
-        instruction: 'Un pilar aguanta {per} kilos. Cruzan {weight} kilos.',
-        highlightWords: ['{per} kilos', '{weight} kilos'],
-        data: { gen: 'pillars', unit: 'pilares' },
+        type: 'order',
+        skills: ['secuencias', 'incendio'],
+        title: 'Plan de salida',
+        instruction: 'Toca los pasos en orden.',
         socraticHints: {
-          level1_question: '¿Cuánto aguantan 2 pilares de {per}?',
-          level2_visual: 'Suma {per} varias veces hasta pasar {weight}.',
-          level3_analogy: 'Bolsas de {per} mandarinas. ¿Cuántas para {weight}?',
+          level1_question: '¿A quién debes avisar primero?',
+          level2_visual: 'Primero avisas, luego sales, afuera llamas.',
+          level3_analogy: 'Como un recreo: suena el timbre, sales y te reúnes.',
+        },
+        data: {
+          items: [
+            { id: 'avisar', text: 'Gritar ¡fuego! para avisar', icon: 'Megaphone' },
+            { id: 'salir', text: 'Salir agachado', icon: 'ArrowDownToLine' },
+            { id: 'llamar', text: 'Llamar al 9-1-1 desde afuera', icon: 'Phone' },
+          ],
+          correctOrder: ['avisar', 'salir', 'llamar'],
         },
       },
       {
-        type: 'number',
-        skill: 'perimetro',
-        duoRole: 'AB',
-        title: 'La baranda',
-        instruction: 'La baranda va por todo el borde.',
-        highlightWords: ['todo el borde'],
-        data: { gen: 'perimeter', unit: 'metros' },
+        type: 'share',
+        skills: ['repartir', 'incendio'],
+        title: 'Salidas seguras',
+        instruction: 'Hay {total} vecinos. Salgan igual por las 3 puertas.',
+        highlightWords: ['{total} vecinos', 'igual'],
+        data: { unit: 'vecinos', sectors: ['Norte', 'Sur', 'Este'] },
         socraticHints: {
-          level1_question: '¿Cuántos lados tiene el rectángulo?',
-          level2_visual: 'Suma los 4 lados: {w}, {h}, {w} y {h}.',
-          level3_analogy: 'Al rodear una mesa pasas por 4 lados.',
+          level1_question: '¿Qué número, 3 veces, da {total}?',
+          level2_visual: 'Haz 3 filas iguales con {total} vecinos.',
+          level3_analogy: '6 dulces para 3 amigos: 2 cada uno. ¿Y {total}?',
         },
       },
     ],
     offScreenChallenge: {
-      actionPrompt: 'Con alguien, formen un arco con las manos.',
+      actionPrompt: 'Con tu familia, elijan un punto de encuentro afuera de casa.',
       breathingSeconds: 15,
-      companionPrompt: '¡En equipo todo es más fácil!',
-    },
-  },
-
-  // ==========================================================================
-  // MISIÓN 4 · Cabaña de la abuela (causa y efecto, palabras, avisos)
-  // ==========================================================================
-  {
-    id: 'mision-4-bosque',
-    stationName: 'Cabaña de la Abuela',
-    title: 'La Bitácora del Bosque y la Abuela',
-    subject: 'Lectura Comprensiva',
-    shortStory: ['La abuela lee el clima en la naturaleza.', 'Leamos su bitácora.'],
-    squirrelCall: 'La abuela nos espera al otro lado del río.',
-    steps: [
-      {
-        type: 'read',
-        skill: 'causa',
-        title: 'Señales del clima',
-        instruction: '',
-        socraticHints: {
-          level1_question: '¿Qué señal vio la abuela?',
-          level2_visual: 'Primero pasa la señal. Después llega el clima.',
-          level3_analogy: 'Si ves nubes negras, sacas el paraguas.',
-        },
-        data: {
-          source: 'La Abuela',
-          badge: 'Saber',
-          options: [
-            { id: 'lluvia', text: 'Va a llover fuerte', icon: 'CloudRain' },
-            { id: 'sol', text: 'Va a hacer sol', icon: 'Sun' },
-            { id: 'viento', text: 'Va a venir viento', icon: 'Wind' },
-          ],
-          variants: [
-            {
-              blocks: [
-                { text: 'Las aves bajan cantando de la colina.', icon: 'Bird' },
-                { text: 'Así avisan que viene lluvia fuerte.', icon: 'CloudRain' },
-              ],
-              question: '¿Qué va a pasar?',
-              answer: 'lluvia',
-            },
-            {
-              blocks: [
-                { text: 'El cielo está rojo al atardecer.', icon: 'Sun' },
-                { text: 'Mañana hará sol y calor.', icon: 'Sun' },
-              ],
-              question: '¿Qué va a pasar mañana?',
-              answer: 'sol',
-            },
-            {
-              blocks: [
-                { text: 'Las hojas giran y suben solas.', icon: 'Leaf' },
-                { text: 'Pronto llega un viento fuerte.', icon: 'Wind' },
-              ],
-              question: '¿Qué va a pasar?',
-              answer: 'viento',
-            },
-          ],
-        },
-      },
-      {
-        type: 'vocab',
-        skill: 'palabras',
-        title: 'Palabras de la tierra',
-        instruction: 'Toca las 4 tarjetas.',
-        socraticHints: {
-          level1_question: 'Busca la tarjeta de esa palabra.',
-          level2_visual: 'Abajo de cada palabra está lo que significa.',
-          level3_analogy: 'Cada idioma es una llave nueva.',
-        },
-        data: {
-          words: [
-            { language: 'Ngäbere', word: 'Ñö', meaning: 'Agua', say: 'Ño. Significa agua.', lang: 'es' },
-            { language: 'Ngäbere', word: 'Däbere', meaning: 'Amigo', say: 'Dá be re. Significa amigo.', lang: 'es' },
-            { language: 'Emberá', word: 'Do', meaning: 'Río', say: 'Do. Significa río.', lang: 'es' },
-            { language: 'Inglés', word: 'Safe shelter', meaning: 'Refugio', say: 'Seif shélter. Significa refugio.', lang: 'es' },
-          ],
-        },
-      },
-      {
-        type: 'read',
-        skill: 'avisos',
-        title: 'Cuida el huerto',
-        instruction: '',
-        socraticHints: {
-          level1_question: '¿Qué dice la guía que hay que hacer?',
-          level2_visual: 'Busca qué cosa se usa en la guía.',
-          level3_analogy: 'Como una receta: dice qué usar.',
-        },
-        data: {
-          source: 'Huerto Escolar',
-          badge: 'Guía',
-          options: [
-            { id: 'piedras', text: 'Poner piedras en fila', icon: 'Mountain' },
-            { id: 'canales', text: 'Cavar canales', icon: 'Shovel' },
-            { id: 'hojas', text: 'Tapar con hojas', icon: 'Leaf' },
-          ],
-          variants: [
-            {
-              blocks: [
-                { text: 'La tierra del huerto se derrumba.', icon: 'Sprout' },
-                { text: 'Las piedras en fila la sostienen.', icon: 'Mountain' },
-              ],
-              question: '¿Qué hacemos?',
-              answer: 'piedras',
-            },
-            {
-              blocks: [
-                { text: 'El huerto se llena de agua.', icon: 'Droplet' },
-                { text: 'Los canales llevan el agua lejos.', icon: 'Shovel' },
-              ],
-              question: '¿Qué hacemos?',
-              answer: 'canales',
-            },
-            {
-              blocks: [
-                { text: 'Las semillas están sueltas.', icon: 'Sprout' },
-                { text: 'Las hojas grandes las protegen.', icon: 'Leaf' },
-              ],
-              question: '¿Qué hacemos?',
-              answer: 'hojas',
-            },
-          ],
-        },
-      },
-    ],
-    offScreenChallenge: {
-      actionPrompt: 'Busca una hoja y mira su forma.',
-      breathingSeconds: 15,
-      companionPrompt: 'Enséñale "Ñö" (agua) a alguien hoy.',
+      companionPrompt: '¡Bombero junior! Sal agachado y llama al 9-1-1.',
     },
   },
 ];
 
 export const missionById = (id: string) => MISSIONS.find((m) => m.id === id);
 
-/** Siguiente misión del sendero (orden lineal: menos decisiones = menos bloqueo ejecutivo). */
+/** Siguiente nivel (orden lineal: menos decisiones = menos bloqueo ejecutivo). */
 export const nextMission = (completed: string[]) => MISSIONS.find((m) => !completed.includes(m.id)) ?? null;
 
 export const isUnlocked = (id: string, completed: string[]) => {

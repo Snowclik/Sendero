@@ -48,13 +48,20 @@ fn check_offline_status(app: AppHandle) -> Result<String, String> {
     Ok(data_dir(&app)?.display().to_string())
 }
 
+/// Cierra el juego desde el botón "Salir" del menú.
+#[tauri::command]
+fn exit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             save_offline_progress,
             load_offline_progress,
-            check_offline_status
+            check_offline_status,
+            exit_app
         ])
         .run(tauri::generate_context!())
         .expect("Error al iniciar Sendero");

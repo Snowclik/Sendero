@@ -11,6 +11,8 @@
  */
 import * as THREE from 'three';
 import type { MissionId } from '../data/missionsData';
+import { buildCharacter, type Character } from './character';
+import { DEFAULT_OUTFIT, type Outfit } from '../data/wardrobe';
 
 const W = 36;
 const D = 28;
@@ -19,12 +21,12 @@ const RIVER_X1 = 24;
 const BRIDGE_Z = [16, 17];
 
 export const STATION_TILES: Record<MissionId, { x: number; z: number }> = {
-  'mision-1-agua': { x: 17, z: 8 },
-  'mision-2-rumor': { x: 10, z: 12 },
-  'mision-3-puente': { x: 19, z: 16 },
-  'mision-4-bosque': { x: 29, z: 12 },
+  'nivel-sismo': { x: 10, z: 12 }, // escuela de la plaza
+  'nivel-inundacion': { x: 17, z: 8 }, // orilla del río (tanque medidor)
+  'nivel-tormenta': { x: 19, z: 16 }, // campo abierto junto al puente
+  'nivel-incendio': { x: 29, z: 12 }, // cabaña del bosque
 };
-const STATION_ORDER: MissionId[] = ['mision-1-agua', 'mision-2-rumor', 'mision-3-puente', 'mision-4-bosque'];
+const STATION_ORDER: MissionId[] = ['nivel-sismo', 'nivel-inundacion', 'nivel-tormenta', 'nivel-incendio'];
 const START = { x: 6.5, z: 21.5 };
 
 export type StationState = 'locked' | 'open' | 'done';
@@ -86,7 +88,7 @@ export class IsoWorld {
   private water = new Uint8Array(W * D);
   private bridgeWalkable = false;
 
-  private player = new THREE.Group();
+  private player: THREE.Group = new THREE.Group();
   // Chispa la ardilla: compañera que sigue al jugador
   private squirrel = new THREE.Group();
   private sqTail: THREE.Group | null = null;
@@ -95,7 +97,8 @@ export class IsoWorld {
   private sqCheer = 0;
   /** Div posicionado cada frame sobre la cabeza de la ardilla: la UI dibuja ahí su globo. */
   public readonly squirrelAnchor: HTMLDivElement;
-  private limbs: { legL: THREE.Mesh; legR: THREE.Mesh; armL: THREE.Mesh; armR: THREE.Mesh } | null = null;
+  private limbs: Character['limbs'] | null = null;
+  private character: Character | null = null;
   private pos = new THREE.Vector3(START.x, 0, START.z);
   private path: { x: number; z: number }[] = [];
   private pendingInteract: MissionId | null = null;
@@ -416,16 +419,17 @@ export class IsoWorld {
   }
 
   private buildBoard(boxes: Box[]) {
-    // Tablón del pueblo con 3 mensajes
-    boxes.push({ x: 9.3, y: 0.8, z: 10.5, sx: 0.15, sy: 1.6, sz: 0.15, color: C.woodDark });
-    boxes.push({ x: 11.7, y: 0.8, z: 10.5, sx: 0.15, sy: 1.6, sz: 0.15, color: C.woodDark });
-    boxes.push({ x: 10.5, y: 1.3, z: 10.5, sx: 2.6, sy: 1.0, sz: 0.12, color: C.wood });
-    boxes.push({ x: 9.8, y: 1.35, z: 10.58, sx: 0.5, sy: 0.6, sz: 0.04, color: 0xfef9c3, ry: 0.06 });
-    boxes.push({ x: 10.5, y: 1.3, z: 10.58, sx: 0.5, sy: 0.6, sz: 0.04, color: 0xffffff });
-    boxes.push({ x: 11.2, y: 1.35, z: 10.58, sx: 0.5, sy: 0.6, sz: 0.04, color: 0xfecdd3, ry: -0.05 });
-    this.block(9, 10, 11, 10);
-    this.boardBanner = this.box(2.6, 0.3, 0.14, C.emerald);
-    this.boardBanner.position.set(10.5, 1.95, 10.5);
+    // Escuela de la plaza (nivel Sismo) en x 9..11, z 9..10
+    boxes.push({ x: 10.5, y: 0.8, z: 9.9, sx: 2.8, sy: 1.6, sz: 1.6, color: 0xfde68a });
+    boxes.push({ x: 10.5, y: 1.75, z: 9.9, sx: 3.1, sy: 0.3, sz: 1.9, color: C.roof });
+    boxes.push({ x: 10.5, y: 2.1, z: 9.9, sx: 2.2, sy: 0.4, sz: 1.3, color: C.roof });
+    boxes.push({ x: 10.5, y: 0.55, z: 10.72, sx: 0.6, sy: 1.1, sz: 0.06, color: C.woodDark });
+    boxes.push({ x: 9.5, y: 1.0, z: 10.72, sx: 0.45, sy: 0.4, sz: 0.06, color: 0xbae6fd });
+    boxes.push({ x: 11.5, y: 1.0, z: 10.72, sx: 0.45, sy: 0.4, sz: 0.06, color: 0xbae6fd });
+    boxes.push({ x: 10.5, y: 2.55, z: 9.9, sx: 0.35, sy: 0.35, sz: 0.35, color: 0xf59e0b }); // campana
+    this.block(9, 9, 11, 10);
+    this.boardBanner = this.box(1.4, 0.3, 0.14, C.emerald);
+    this.boardBanner.position.set(10.5, 1.35, 10.8);
     this.boardBanner.visible = false;
     this.scene.add(this.boardBanner);
   }
@@ -492,33 +496,16 @@ export class IsoWorld {
   }
 
   private buildPlayer() {
-    const mk = (sx: number, sy: number, sz: number, color: number, x: number, y: number, z: number, pivotTop = false) => {
-      const g = new THREE.BoxGeometry(sx, sy, sz);
-      if (pivotTop) g.translate(0, -sy / 2, 0);
-      const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color }));
-      mesh.position.set(x, y, z);
-      this.player.add(mesh);
-      return mesh;
-    };
-    const legL = mk(0.2, 0.45, 0.22, 0x475569, -0.12, 0.45, 0, true);
-    const legR = mk(0.2, 0.45, 0.22, 0x475569, 0.12, 0.45, 0, true);
-    mk(0.5, 0.5, 0.3, 0x0ea5e9, 0, 0.7, 0); // túnica cielo
-    mk(0.36, 0.38, 0.14, C.amber, 0, 0.72, -0.21); // mochila
-    const armL = mk(0.15, 0.45, 0.18, 0x0284c7, -0.33, 0.92, 0, true);
-    const armR = mk(0.15, 0.45, 0.18, 0x0284c7, 0.33, 0.92, 0, true);
-    mk(0.42, 0.42, 0.42, 0xf2c9a0, 0, 1.17, 0); // cabeza
-    mk(0.46, 0.14, 0.46, 0x5b3a22, 0, 1.4, 0); // cabello
-    mk(0.08, 0.08, 0.02, 0x1e293b, -0.09, 1.2, 0.215); // ojos
-    mk(0.08, 0.08, 0.02, 0x1e293b, 0.09, 1.2, 0.215);
-    const shadow = new THREE.Mesh(
-      new THREE.CircleGeometry(0.38, 20).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.16 })
-    );
-    shadow.position.y = 0.02;
-    this.player.add(shadow);
-    this.limbs = { legL, legR, armL, armR };
+    this.character = buildCharacter(DEFAULT_OUTFIT);
+    this.player = this.character.group;
+    this.limbs = this.character.limbs;
     this.player.position.copy(this.pos);
     this.scene.add(this.player);
+  }
+
+  /** Viste al explorador con la ropa elegida en el vestuario. */
+  setOutfit(o: Outfit) {
+    this.character?.apply(o);
   }
 
   private buildSquirrel() {
@@ -963,14 +950,13 @@ export class IsoWorld {
   /** Devuelve las piezas del mundo al estado guardado (al salir de una misión sin terminar). */
   resetMissionVisuals() {
     const done = (id: MissionId) => this.stationStates[id] === 'done';
-    this.setFilters(done('mision-1-agua') ? 4 : 0, 6);
-    this.setGauge(done('mision-1-agua') ? 10 : 0, 10);
-    this.fountainWater.visible = done('mision-1-agua');
-    this.boardBanner.visible = done('mision-2-rumor');
-    const bridge = done('mision-3-puente');
-    this.setBridge({ beams: bridge ? 4 : 0, pillars: bridge ? 2 : 0, rails: bridge });
-    this.bridgeWalkable = bridge;
-    this.gardenCover.visible = done('mision-4-bosque');
+    this.boardBanner.visible = done('nivel-sismo');
+    this.setFilters(done('nivel-inundacion') ? 0 : 3, 1, 4); // medidor del río: baja al terminar
+    this.fountainWater.visible = done('nivel-inundacion');
+    this.gardenCover.visible = done('nivel-incendio');
+    // El puente ya está reparado: conecta el campo con la cabaña
+    this.setBridge({ beams: 4, pillars: 2, rails: true });
+    this.bridgeWalkable = true;
   }
 
   /** Misión 1: filtros encendidos -> el tanque sube (marca ámbar = la meta de litros). */

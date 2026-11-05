@@ -1,20 +1,25 @@
 import type { FunctionalComponent } from 'preact';
 import { useState } from 'preact/hooks';
 import {
-  Award, BookOpen, Brain, Calculator, Droplets, Ear, Footprints, Hammer, HeartHandshake, Lock, Repeat, ScrollText, Sprout, Squirrel,
-  Star, Target, Trophy, Users, Wind, X, Zap,
+  Activity, Award, BookOpen, Brain, Calculator, CloudLightning, Ear, Flame, Footprints, HeartHandshake, LifeBuoy, Lock, Repeat, Shirt, Squirrel,
+  Star, Target, Trophy, Users, Waves, Wind, X, Zap,
 } from 'lucide-preact';
 import { ACHIEVEMENTS } from '../data/achievements';
-import { SKILLS } from '../data/missionsData';
+import { SKILLS, type Subject } from '../data/missionsData';
 import type { StudentProfile } from '../services/storageService';
 import { playClickSound } from '../services/soundService';
 
-const ICONS = { Droplets, ScrollText, Hammer, Sprout, Users, HeartHandshake, Zap, Target, Squirrel, Wind, Footprints, Repeat, Brain, Ear };
+const ICONS = { Activity, Waves, CloudLightning, Flame, Shirt, Users, HeartHandshake, Zap, Target, Squirrel, Wind, Footprints, Repeat, Brain, Ear };
 const LEVEL = ['Nuevo', 'Aprendiendo', 'Casi', '¡Lo domino!'];
+const SUBJECT_LOOK = {
+  prevencion: { name: 'Qué hacer', Icon: LifeBuoy, tile: 'bg-rose-400 shadow-[0_4px_0_#be123c]', bar: 'bg-rose-400' },
+  matematica: { name: 'Matemática', Icon: Calculator, tile: 'bg-amber-400 shadow-[0_4px_0_#b45309]', bar: 'bg-amber-400' },
+  espanol: { name: 'Español', Icon: BookOpen, tile: 'bg-emerald-500 shadow-[0_4px_0_#047857]', bar: 'bg-emerald-500' },
+};
 
 const Stars = ({ n }: { n: number }) => (
   <span className="flex gap-0.5" aria-label={`${n} de 3 estrellas`}>
-    {[0, 1, 2].map((i) => <Star key={i} className={`w-5 h-5 ${i < n ? 'text-amber-400 fill-amber-300' : 'text-[#e6d3ab]'}`} />)}
+    {[0, 1, 2].map((i) => <Star key={i} className={`w-4 h-4 shrink-0 ${i < n ? 'text-amber-400 fill-amber-300' : 'text-[#e6d3ab]'}`} />)}
   </span>
 );
 
@@ -23,7 +28,7 @@ export const AchievementsModal: FunctionalComponent<{ isOpen: boolean; onClose: 
   if (!isOpen) return null;
 
   const earned = ACHIEVEMENTS.filter((a) => a.earned(student)).length;
-  const subject = (s: 'matematica' | 'espanol') => {
+  const subject = (s: Subject) => {
     const list = SKILLS.filter((k) => k.subject === s);
     const stars = list.reduce((a, k) => a + (student.skills[k.id]?.mastery ?? 0), 0);
     return { list, pct: Math.round((stars / (list.length * 3)) * 100) };
@@ -39,7 +44,7 @@ export const AchievementsModal: FunctionalComponent<{ isOpen: boolean; onClose: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-sky-100/50 backdrop-blur-sm overflow-y-auto">
-      <div className="cozy-panel relative w-full max-w-3xl my-6 p-5 sm:p-6 animate-fadeIn">
+      <div className="cozy-panel relative w-full max-w-4xl my-6 p-5 sm:p-6 animate-fadeIn">
         <button onClick={onClose} className="absolute top-4 right-4 w-10 h-10 rounded-2xl bg-white shadow-[0_4px_0_#e6d3ab] flex items-center justify-center text-slate-500" aria-label="Cerrar logros">
           <X className="w-5 h-5" />
         </button>
@@ -69,20 +74,20 @@ export const AchievementsModal: FunctionalComponent<{ isOpen: boolean; onClose: 
         )}
 
         {tab === 'aprendo' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(['matematica', 'espanol'] as const).map((s) => {
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {(['prevencion', 'matematica', 'espanol'] as const).map((s) => {
               const { list, pct } = subject(s);
-              const math = s === 'matematica';
+              const look = SUBJECT_LOOK[s];
               return (
                 <div key={s} className="cozy-inset p-3 flex flex-col gap-2">
                   <div className="flex items-center gap-3 mb-1">
-                    <span className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white ${math ? 'bg-amber-400 shadow-[0_4px_0_#b45309]' : 'bg-emerald-500 shadow-[0_4px_0_#047857]'}`}>
-                      {math ? <Calculator className="w-7 h-7" /> : <BookOpen className="w-7 h-7" />}
+                    <span className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white ${look.tile}`}>
+                      <look.Icon className="w-7 h-7" />
                     </span>
                     <div className="flex-1">
-                      <p className="font-black text-slate-800">{math ? 'Matemática' : 'Español'}</p>
+                      <p className="font-black text-slate-800">{look.name}</p>
                       <div className="h-3 rounded-full bg-white overflow-hidden">
-                        <div className={`h-full rounded-full transition-all ${math ? 'bg-amber-400' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
+                        <div className={`h-full rounded-full transition-all ${look.bar}`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                     <span className="font-black text-slate-600">{pct}%</span>
@@ -92,8 +97,10 @@ export const AchievementsModal: FunctionalComponent<{ isOpen: boolean; onClose: 
                     const m = p?.mastery ?? 0;
                     return (
                       <div key={k.id} className="cozy-tile px-3 py-2 flex items-center gap-2">
-                        <span className="flex-1 font-black text-slate-700 text-sm">{k.name}</span>
-                        <span className={`text-[11px] font-black ${m >= 3 ? 'text-emerald-600' : 'text-slate-400'}`}>{p ? LEVEL[m] : 'Por descubrir'}</span>
+                        <span className="flex-1 min-w-0 flex flex-col">
+                          <span className="font-black text-slate-700 text-sm leading-tight">{k.name}</span>
+                          <span className={`text-[11px] font-black ${m >= 3 ? 'text-emerald-600' : 'text-slate-400'}`}>{p ? LEVEL[m] : 'Por descubrir'}</span>
+                        </span>
                         <Stars n={m} />
                       </div>
                     );
@@ -101,7 +108,7 @@ export const AchievementsModal: FunctionalComponent<{ isOpen: boolean; onClose: 
                 </div>
               );
             })}
-            <p className="md:col-span-2 text-xs text-slate-500 text-center">Las estrellas suben cuando aciertas a la primera, con números nuevos cada vez.</p>
+            <p className="md:col-span-3 text-xs text-slate-500 text-center">Las estrellas suben cuando aciertas a la primera, con números nuevos cada vez.</p>
           </div>
         )}
       </div>
